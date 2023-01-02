@@ -14,7 +14,7 @@ public:
         Tensor x({2, 2, 3, 3}, TensorInit_Types::Ordinal);
         Tensor z({2}, TensorInit_Types::Ordinal);
 
-        ENABLE_LOGGING(true);
+        ENABLE_LOGGING(false);
         Vector<double> losses;
         trainer.train(x, z, network, {Optimizer_Types::Sgd, 0.000001, 0, 0.2}, {2, 100}, losses);
         LOG_INFO("Final loss:" << losses[losses.size() - 1]);
