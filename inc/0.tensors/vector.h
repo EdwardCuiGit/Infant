@@ -604,6 +604,16 @@ public:
         return len > 0 ? res / len : 0;
     }
 
+    NOTEST T var(uint v1_start = 0, int len = -1, T alpha = 1.0, T beta = 0.0) const
+    {
+        if (len < 0)
+            len = this->size() - v1_start;
+        
+        T mean = avg(v1_start, len, alpha, beta);
+        auto res = sum_func([mean](T e) -> T{return (e - mean) * (e - mean);}, v1_start, len);
+        return len > 0 ? res / len : 0;
+    }
+
     T max(uint v1_start = 0, int len = -1) const
     {
         return reduce(
@@ -681,5 +691,14 @@ public:
         return bool_func([strict](T e) -> bool
                          { return strict ? e > 0 && e < 1 : e >= 0 && e <= 1; },
                          v1_start, len);
+    }
+
+    // manipulation funcs
+    static void flatten(const Vector<Vector<T>>& bins_vector, Vector<T>& flatten_vector)
+    {
+        for (uint i = 0; i < bins_vector.size(); ++i)
+        {
+            flatten_vector.append(bins_vector[i]);
+        }
     }
 };

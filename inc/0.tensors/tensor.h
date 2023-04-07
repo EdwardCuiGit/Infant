@@ -73,6 +73,7 @@ class TensorD
     friend class TestFunctorGraph;
     friend class TestOptimizers;
     friend class TestDataLoaders;
+    friend class Gbdt;
 
 #pragma region privates
 private:
@@ -1724,8 +1725,14 @@ public:
         assert(offset + size <= this->size());
         
         y.reset(dim);
-        y._vector->copy(this->vector(), offset, size);
+        y._vector->copy(this->vector(), offset, size); // deep copy
         return y;
+    }
+
+    SUGAR TensorD<T> subset(const Vector<uint>& dim, uint offset) const
+    {
+        TensorD<T> y;
+        return subset(y, dim, offset);
     }
 
     TensorD<T> &subset_grad(const TensorD<T> &y, const TensorD<T> &y_grad, TensorD<T> &x_grad, const Vector<uint>& dim, uint offset) const

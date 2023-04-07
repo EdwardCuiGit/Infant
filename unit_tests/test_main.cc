@@ -19,6 +19,7 @@
 #include "test_optimizers.cc"
 #include "test_dataloaders.cc"
 #include "test_raw_trainer.cc"
+#include "test_gbdt.cc"
 /*
 predefs.h: memory, iostream, limits, cassert
 array.h: predefs.h, vector, initializer_list, algorithm, functional
@@ -46,6 +47,7 @@ int main(int argc, char *argv[])
         REGISTER_TEST_CLASS(TestOptimizers),
         REGISTER_TEST_CLASS(TestDataLoaders),
         REGISTER_TEST_CLASS(TestRawTrainer),
+        REGISTER_TEST_CLASS(TestGbdt),
     };
 
     for (auto test_class : test_classes)
