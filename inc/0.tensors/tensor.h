@@ -278,11 +278,9 @@ public:
             size *= dim()[i + from];
         }
 
-
-
-        //
         return size;
     }
+
 #pragma endregion
 private:
 #pragma region binary_maps
