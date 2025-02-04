@@ -116,7 +116,7 @@ public:
         Vector<double> v1{1, 2, 3, 5};
         Vector<double> v2{4, 3, 2, 1};
         double res = v1.mse(v2);
-        assert(ALMOST_ZERO(res - 27 / 4.0));
+        Math<double>::assert_almost_equal(res, 27 / 4.0);
     }
 
     static void test_ce()
@@ -124,7 +124,7 @@ public:
         Vector<double> v1{0.1, 0.2, 0.4, 0.5, 0.6};
         Vector<double> v2{0.2, 0.2, 0.3, 0.4, 0.1};
 
-        assert_almost_equal(v1.ce(v2), 4.04548557050879);
+        Math<double>::assert_almost_equal(v1.ce(v2), 4.04548557050879);
     }
 
     static void test_bce()
@@ -132,7 +132,7 @@ public:
         Vector<double> v1{1, 0, 0, 1, 0};
         Vector<double> v2{0.1, 0.2, 0.4, 0.5, 0.6};
         auto res = v1.bce(v2);
-        assert_almost_equal(res, 1.3405499757656585);
+        Math<double>::assert_almost_equal(res, 1.3405499757656585);
     }
 
     static void test_re()
@@ -140,7 +140,7 @@ public:
         Vector<double> v1{0.1, 0.2, 0.4, 0.5, 0.6};
         Vector<double> v2{0.2, 0.2, 0.3, 0.4, 0.1};
         auto res = v1.re(v2);
-        assert_almost_equal(res, 1.7779565475879124);
+        Math<double>::assert_almost_equal(res, 1.7779565475879124);
     }
 
     static void test_cosine_distance()
@@ -148,7 +148,7 @@ public:
         Vector<double> v1{1, 2, 3, 5};
         Vector<double> v2{4, 3, 2, 1};
         double res = v1.cosine_distance(v2);
-        ALMOST_ZERO(res - 21 / std::sqrt(39.0) / std::sqrt(30.0));
+        Math<double>::assert_almost_equal(res, 21 / std::sqrt(39.0) / std::sqrt(30.0));
     }
 
     static void test_euclidean()
@@ -156,7 +156,7 @@ public:
         Vector<double> v1{1, 2, 3, 5};
         Vector<double> v2{4, 3, 2, 1};
         double res = v1.euclidean(v2);
-        ALMOST_ZERO(res - std::sqrt(27));
+        Math<double>::assert_almost_equal(res, std::sqrt(27));
     }
 
     static void test_match_bottom()
@@ -225,7 +225,7 @@ public:
     {
         Vector<double> v1{2, 3, 4, 3};
         auto res = v1.norm_ln(2, 0, v1.size());
-        assert(ALMOST_ZERO(res - 6.164414002968976));
+        Math<double>::assert_almost_equal(res, 6.164414002968976);
     }
 
     static void test_norm_l1()
@@ -238,12 +238,12 @@ public:
     {
         Vector<double> v1{0.1, 0.2, 0.4, 0.5, 0.6};
         auto res = v1.entropy(0, v1.size());
-        assert_almost_equal(res, 2.2675290229208773);
+        Math<double>::assert_almost_equal(res, 2.2675290229208773);
     }
 
     static void test_binary_entropy()
     {
-        assert_almost_equal(Vector<double>::binary_entropy(0.2), 0.721928);
+        Math<double>::assert_almost_equal(Vector<double>::Binary_Entropy(0.2), 0.721928);
     }
 
     static void test_all_pos()

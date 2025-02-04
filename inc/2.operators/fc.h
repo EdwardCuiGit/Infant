@@ -3,53 +3,67 @@
 #include "operator_base.h"
 
 // projection op: vector[N, I] -> vector[N, O]
+
+//NOTE: each Op needs to be registered in raw_trainer::init_env()
 class Fc: public UnOp
 {
+    friend class TestOperatorBase;
+public:
+    struct Config : ConfigBase
+    {
+        DEFINE_FIELD(uint, input_dim, 1);
+        DEFINE_FIELD(uint, output_dim, 1);
+        DEFINE_FIELD(bool, has_bias, false);
+        DEFINE_FIELD(uint, w_type, (uint)TensorInit_Types::Gaussian);
+        DEFINE_FIELD(uint, b_type, (uint)TensorInit_Types::Zero);
+
+        Config(uint _input_dim = 1, uint _output_dim = 1, bool _has_bias = 1, TensorInit_Types _w_type = TensorInit_Types::Gaussian,
+        TensorInit_Types _b_type = TensorInit_Types::Zero) : ConfigBase("Fc")
+        {
+            input_dim() = _input_dim;
+            output_dim() = _output_dim;
+            has_bias() = _has_bias;
+            w_type() = (uint)_w_type;
+            b_type() = (uint)_b_type;
+        }
+    };
+
 private:
-    uint _input_dim;
-    uint _output_dim;
-    bool _has_bias;
+    Config _c;
 
     Tensor _w, _b;
 
 public:
-    Fc(uint input_dim, uint output_dim, bool has_bias = true, TensorInit_Types w_type = TensorInit_Types::Gaussian,
-    TensorInit_Types b_type = TensorInit_Types::Zero)
-        : _input_dim(input_dim), _output_dim(output_dim), _has_bias(has_bias)
+    // note: _c must pass to UnOp, and c must pass to _c
+    Fc(const Config & c) : UnOp(&_c, "Fc"), _c(c)
     {
-        assert(input_dim > 0 && output_dim > 0);
+        assert(_c.input_dim() > 0 && _c.output_dim() > 0);
 
-        _w = create_param("w", {output_dim, input_dim}, w_type);
-        if (_has_bias)
+        _w = add_param("w", {_c.output_dim(), _c.input_dim()}, (TensorInit_Types)_c.w_type());
+        if (_c.has_bias())
         {
-            _b = create_param("b", {output_dim}, b_type);
+            _b = add_param("b", {_c.output_dim()}, (TensorInit_Types)_c.b_type());
         }
     }
 
     /*
-    input:  x[batch_size, input_dim]
-    output: y[batch_size, output_dim], will init inside the func
+    input:  x[batch_size, ..., input_dim]
+    output: y[batch_size, ..., output_dim], will init inside the func
     y[k, i] = sum(j, x[k, j] * w[i, j])
     */
-    virtual void forward(const Tensor &x, Tensor &y) const override
+    virtual Tensor forward(const Tensor &x) const override
     {
-        assert(x.shape() == 2);
-        assert(x.dim().back() == _input_dim);
+        assert(x.shape() >= 2);
+        assert(x.dim().back() == _c.input_dim());
 
         //[batch_size, input_dim] . [output_dim, input_dim] => [batch_size, output_dim]
-        y = x.dot(_w); // dot-product between a batch of vectors and a list of weights
-        if (_has_bias)
+        Tensor y = x.dot(_w); // dot-product between a batch of vectors and a list of weights
+        if (_c.has_bias())
         {
             y.add_(_b); // add to y
         }
 
-        y = y.squeeze();
+        //y = y.squeeze(); // note: this is not good if it's expected 1 size dim
+        return y;
     }
-};
-
-// projection op: vector[N, L, I] -> vector[N, L, O]
-// TODO: forward func is the same as Linear, backward may be different
-
-class NodeLinear : public Linear
-{
 };

@@ -57,10 +57,15 @@ public:
         a4.set(0, {0, 1, 2});
         a4.insert(1, {2, 3});
         assert(a4.equals_to({0, 2, 3, 1, 2}));
+        a4.insert(1, 2);
+        assert(a4.equals_to({0, 2, 2, 3, 1, 2}));
+
+        auto a4_copy = a4.clone();
+        assert(a4_copy.equals_to({0, 2, 2, 3, 1, 2}));
 
         Array<double> a5{1, 2};
         a5.append(a4, 1, 3);
-        assert(a5.equals_to({1, 2, 2, 3, 1}));
+        assert(a5.equals_to({1, 2, 2, 2, 3}));
 
         a5.erase(3);
         assert(a5.equals_to({1, 2, 2}));

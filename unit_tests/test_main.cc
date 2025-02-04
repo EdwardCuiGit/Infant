@@ -9,16 +9,20 @@
 #include "../src/1.functors/unmo_func.cc"
 #include "../src/1.functors/bin_func.cc"
 #include "../src/1.functors/functor_graph.cc"
+#include "../src/2.operators/operator_base.cc"
+#include "test_config_base.cc"
 #include "test_fc.cc"
 #include "test_conv.cc"
 #include "test_pooling.cc"
-#include "test_transformer.cc"
 #include "test_rnn.cc"
 #include "test_norm.cc"
 #include "test_functor_graph.cc"
+#include "test_attentions.cc"
+#include "test_operator_base.cc"
+#include "test_transformer.cc"
 #include "test_optimizers.cc"
 #include "test_dataloaders.cc"
-#include "test_raw_trainer.cc"
+#include "test_trainers.cc"
 #include "test_gbdt.cc"
 /*
 predefs.h: memory, iostream, limits, cassert
@@ -37,18 +41,23 @@ int main(int argc, char *argv[])
         REGISTER_TEST_CLASS(TestVector),
         REGISTER_TEST_CLASS(TestTensor),
         REGISTER_TEST_CLASS(TestTensorNode),
+        REGISTER_TEST_CLASS(TestConfigBase),
         REGISTER_TEST_CLASS(TestFc),
         REGISTER_TEST_CLASS(TestConv),
         REGISTER_TEST_CLASS(TestPooling),
-        REGISTER_TEST_CLASS(TestTransformer),
         REGISTER_TEST_CLASS(TestRnn),
         REGISTER_TEST_CLASS(TestNorm),
         REGISTER_TEST_CLASS(TestFunctorGraph),
+        REGISTER_TEST_CLASS(TestAttention),
+        REGISTER_TEST_CLASS(TestOperatorBase),
+        REGISTER_TEST_CLASS(TestTransformer),
         REGISTER_TEST_CLASS(TestOptimizers),
         REGISTER_TEST_CLASS(TestDataLoaders),
-        REGISTER_TEST_CLASS(TestRawTrainer),
-        REGISTER_TEST_CLASS(TestGbdt),
+        REGISTER_TEST_CLASS(TestTrainers),
+        /*REGISTER_TEST_CLASS(TestGbdt),*/
     };
+
+    Environment::Init();
 
     for (auto test_class : test_classes)
     {

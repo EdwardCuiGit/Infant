@@ -1,178 +1,129 @@
 #pragma once
 
 #include "../1.functors/tensor_node.h"
-#include <map>
+#include "config_base.h"
 
-// TODO: add required shape for both input & outputs
-/*class Operator
+class Environment 
 {
-protected:
-    bool _is_train = false; // TODO: not set yet
-    std::string _id;
-    std::map<std::string, Ptr<Parameter>> _p; // all parameters
-    uint _macc = 0;                                       // not used
-
+private:
+    static bool _is_train;
+    static bool _print_functor;
 public:
-    inline ParameterPtr create_param(const std::string& id, const Vector<uint>& dims, TensorInit_Types init_type)
+    static bool Is_Print_Functor()
     {
-        return _p[id] = std::make_shared<Parameter>(id, dims, init_type);
+        return _print_functor;
     }
 
-    virtual bool has_loss() const
+    static void Set_Print_Functor(bool yes = true)
     {
-        return false;
+        _print_functor = yes;
     }
 
-    void set_train(bool yes = true)
+    static bool Is_Train()
+    {
+        return _is_train;
+    }
+
+    static void Set_Train(bool yes = true)
     {
         _is_train = yes;
     }
 
-    // y will be init size inside forward function
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const = 0;
-
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) = 0;
-
-    virtual uint input_tensor_count() const
-    {
-        return 1;
-    }
-
-    virtual uint output_tensor_count() const
-    {
-        return 1;
-    }
-
-    uint parameter_count() const
-    {
-        uint total = 0;
-        for (auto p : _p)
-        {
-            total += p.second->size();
-        }
-
-        return total;
-    }
-
-    uint macc() const
-    {
-        return _macc;
-    }
-
-    uint peak_memory() const
-    {
-    }
-
-    const std::map<std::string, Ptr<Parameter>> *get_params() const
-    {
-        return &_p;
-    }
+    static void Init();
 };
 
-class OperatorMio : public Operator
-{
-private:
-    OVERRIDE void forward(const TensorD<double> &x, TensorD<double> &y) const
-    {
-        assert(false);
-    }
+bool Environment::_is_train = false;
+bool Environment::_print_functor = false;
 
-    OVERRIDE void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad)
-    {
-        assert(false);
-    }
-
-public:
-    //virtual void forward_mio(const VectorBase<const Ptr<const Tensor<double>>>& x,
-    //    const VectorBase<const Ptr<Tensor<double>>>& y) const
-    virtual void forward_mio(const TensorList &x, TensorList &y) const
-    {
-        assert(false);
-    }
-
-    virtual void backward_mio(const TensorList &x, const TensorList &y, const TensorList &y_grad,
-                              TensorList &x_grad)
-    {
-        assert(false);
-    }
-};
-enum OpConfig_Keys
-{
-    HAS_BIAS,
-    INIT_W,
-    INIT_B,
-};
-
-class OperatorConfig
-{
-public:
-    bool get_bool(OpConfig_Keys key) const
-    {
-        // TODO
-        assert(false);
-    }
-
-    int get_int(OpConfig_Keys key) const
-    {
-        // TODO
-        assert(false);
-    }
-};*/
-
-/*class Parameter : public Tensor
-{
-public:
-    TensorInit_Types init_type; 
-    bool save_to_model;         // TODO: not used
-    TensorD<double> momentum;          // TODO: not used
-
-public:
-    Parameter(){}
-    Parameter(const std::string &id, const Vector<uint> &dim, TensorInit_Types t = TensorInit_Types::None)
-        : Tensor(dim, t, id, true), save_to_model(true), init_type(t)
-    {
-    }
-};
-
-typedef Ptr<Parameter> PParameter;
-typedef Array<PParameter> PParameterList;
-
-// TODO: not used
-class ParameterGroup
-{
-public:
-    PParameterList params;
-    std::map<std::string, double> configs; // update strategy is here
-};
-*/
 // Learnable Operator: added parameters
 // TODO: add required shape for both input & outputs
 class Operator : public Functor
 {
+#define REGISTER_OP(name)                                                                                                                                                                                                                                                                                 \
+    {                                                                                                                                                                                                                                                                                                     \
+        Operator::Register_Op(#name, [](const ConfigBase &c) -> Ptr<Operator> { return std::static_pointer_cast<Operator>(std::make_shared<name>(dynamic_cast<const name::Config &>(c))); }, []() -> Ptr<ConfigBase> { return std::static_pointer_cast<ConfigBase>(std::make_shared<name::Config>()); }); \
+    }
+    //{"Fc", []()->Ptr<Operator>{ return std::static_pointer_cast<Operator>(std::make_shared<Fc>());}}
+
 protected:
-    //mutable PParameterList _p; // all parameters
-    mutable TensorList _p;
-    Operator(const std::string& type) : Functor(type){}
+    // below are used for operator registration
+    using Operator_Func = Ptr<Operator> (*)(const ConfigBase &);
+    static Map<std::string, Operator_Func> _Op_Factory;
+
+    // parameter list
+    mutable Map<std::string, Tensor> _p;
+
+    // config pointer
+    ConfigBase *_base_config_ptr = nullptr;
+
+    // sub operators
+    Map<std::string, Ptr<Operator>> _o;
 
 public:
-    inline Tensor create_param(const std::string &id, const Vector<uint> &dims, TensorInit_Types init_type)
+    // used for op registration during env init
+    static void Register_Op(const Str &name, Operator_Func func, ConfigBase::Operator_Config_Func config_func)
     {
-        Tensor p(dims, init_type, id, true);
-        _p.push_back(p);
-        return p;
+        _Op_Factory[name] = func;
+        ConfigBase::_Op_Config_Factory[name] = config_func;
     }
 
-    // used for serialization
-    virtual void load(const std::istream &input)
-    {}
+    static Ptr<Operator> Load_Op(std::istream &i)
+    {
+        Str op_type = StringUtil::read_string(i, "Operator Type");
+        auto op_id = StringUtil::read_string(i, "Operator Id");
 
-    virtual void save(std::ostream &output) const
-    {}
+        // load config of op
+        auto op_config = ConfigBase::Create_Config(op_type);
+        op_config->load(i);
 
-    // auto_grad, not used below, pls do not override this
-    SEALED virtual void backward(TensorList &x, const TensorList &y) override
+        // create op
+        auto op_func = _Op_Factory.find(op_type);
+        assert(op_func != _Op_Factory.end());
+        Ptr<Operator> op = op_func->second(*op_config);
+        op->_type = op_type;
+
+        op->_id = op_id;
+
+        // load parameters of op
+        // TODO: didn't validate configs are consistent with parameter dims
+        op->_load_params(i);
+
+        return op;
+    }
+
+    void save_op(std::ostream &o) const
+    {
+        StringUtil::write_string(o, "Operator Type", this->type());
+        StringUtil::write_string(o, "Operator Id", this->_id);
+        if (_base_config_ptr != nullptr)
+            _base_config_ptr->save(o);
+
+        this->_save_params(o);
+    }
+
+    virtual TensorList forward(const TensorList &x, const RTConfig& rc) const
     {
         assert(false);
+        return x;
+    }
+
+    virtual TensorList forward(const TensorList &x) const
+    {
+        assert(false);
+        return x;
+    }
+
+    virtual bool is_const() const override
+    {
+        for (auto o : _o)
+        {
+            if (!o.second->is_const())
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     uint parameter_count() const
@@ -180,13 +131,13 @@ public:
         uint total = 0;
         for (auto p : _p)
         {
-            total += p.data().size();
+            total += p.second.data().size();
         }
 
         return total;
     }
 
-    TensorList parameters()
+    auto parameters()
     {
         return _p;
     }
@@ -196,21 +147,117 @@ public:
     {
         return false;
     }*/
+
+protected:
+    Operator(ConfigBase *ptr, const std::string &type = "") : Functor(type), _base_config_ptr(ptr)
+    {
+        if (ptr != nullptr)
+        {
+            // ptr->_type = type;
+            // note: this is for auto Config type set, but base class constructor can't access sub class fields as it's not 
+            // generated yet
+        }
+        else
+        {
+            LOG_WARN("ConfigBase is nullptr, which means can not auto save and load:" << type);
+        }
+    }
+
+    template <typename _Tp, typename _ConfigType>
+    Ptr<_Tp> add_op(const std::string &id, const _ConfigType &c)
+    {
+        Ptr<_Tp> op = std::make_shared<_Tp>(c);
+        op->_id = id;
+        op->_type = c._type;
+        assert(_o.find(id) == _o.end());
+        _o[id] = op;
+        return op;
+    }
+
+    inline Tensor add_param(const std::string &id, const Vector<uint> &dims, TensorInit_Types init_type)
+    {
+        Tensor p(dims, init_type, id, true);
+        assert(_p.find(id) == _p.end());
+        _p[id] = p;
+        return p;
+    }
+
+protected:
+    virtual void forward(const TensorList &x, TensorList &y) const override
+    {
+        y = forward(x);
+        assert(false);
+    }
+
+    // don't use this func, instead operator() will be used as non const func
+    // auto_grad, not used below, pls do not override this
+    SEALED virtual void backward(TensorList &x, const TensorList &y) override
+    {
+        assert(false);
+    }
+
+private:
+    inline void _save_params(std::ostream &o) const
+    {
+        o << "start of params of one operator\n";
+        StringUtil::write_uint(o, "param_size", _p.size());
+        for (auto pair : _p)
+        {
+            pair.second.save(o);
+        }
+
+        // the whole op graph has created, but parameters are not saved yet
+        StringUtil::write_uint(o, "Sub_Operator_Count", _o.size());
+        for (auto pair : _o)
+        {
+            StringUtil::write_string(o, "Sub_Op_Id", pair.first);
+            pair.second->_save_params(o);
+        }
+
+        o << "end of params of one operator\n";
+    }
+
+    inline void _load_params(std::istream &i)
+    {
+        StringUtil::assert_next_line(i, "start of params of one operator");
+        uint param_size = StringUtil::read_uint(i, "param_size");
+        assert(param_size > 0);
+
+        for (uint j = 0; j < param_size; ++j)
+        {
+            Tensor t;
+            t.load(i);
+            _p[t.id()] = t;
+        }
+
+        // the whole op graph has created, but parameters are not loaded yet
+        uint sub_op_count = StringUtil::read_uint(i, "Sub_Operator_Count");
+        for (uint j = 0; j < sub_op_count; ++j)
+        {
+            auto sub_op_id = StringUtil::read_string(i, "Sub_Op_Id");
+            auto sub_op = this->_o.find(sub_op_id);
+            assert(sub_op != this->_o.end());
+            sub_op->second->_load_params(i);
+        }
+
+        StringUtil::assert_next_line(i, "end of params of one operator");
+    }
 };
 
 // Unary Learnable Operator
 class UnOp : public Operator
 {
-public:
-    UnOp() : Operator("UnOp"){}
-    virtual void forward(const Tensor &x, Tensor &y) const = 0;//note: could be protected
+protected:
+    UnOp(ConfigBase *ptr, const std::string &type) : Operator(ptr, type) {}
 
-    virtual void forward(const TensorList &x, TensorList &y) const override
+    virtual Tensor forward(const Tensor &x) const = 0;
+
+    SEALED virtual TensorList forward(const TensorList &x) const override
     {
-        assert(x.size() == 1);
-        assert(y.size() == 1);
-        // TODO: shall we keep y nullptr first?
-
-        forward(x[0], y[0]);
+        assert(x.size() >= 1);
+        Tensor y = forward(x[0]);
+        return {y};
     }
 };
+
+Map<std::string, Operator::Operator_Func> Operator::_Op_Factory;

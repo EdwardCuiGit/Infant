@@ -11,16 +11,16 @@ public:
     {
         BatchNorm2d norm(2, 0.5, true, true);
         Tensor x({1, 2, 1, 2}, TensorInit_Types::Ordinal), y;
-        norm.forward(x, y);
+        y = norm.forward(x);
         assert(y.dim().equals_to({1, 2, 1, 2}));
         assert(y.data().vector().equals_to({-1, 1, -1, 1}));
     }
 
     static void test_LayerNorm_forward()
     {
-        LayerNorm norm({1, 2}, 0.1, true, true);
+        LayerNorm norm(LayerNorm::Config({1, 2}, true, 0.1, true, true));
         Tensor x({1, 2, 1, 2}, TensorInit_Types::Ordinal), y;
-        norm.forward(x, y);
+        y = norm.forward(x);
         assert(y.dim().equals_to({1, 2, 1, 2}));
         assert(y.data().vector().equals_to({-1, 1, -1, 1}));
     }

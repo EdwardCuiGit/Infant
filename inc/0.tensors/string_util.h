@@ -1,5 +1,5 @@
 #pragma once
-#include "array.h"
+#include "vector.h"
 #include <cstring>
 
 class StringUtil
@@ -44,5 +44,98 @@ public:
         delete[] strs;
         delete[] seps;
         return res;
+    }
+
+    static std::string read_line(std::istream& i)
+    {
+        std::string line;
+        std::getline(i, line);
+        return line;
+    }
+
+    // prefix = 123
+    static uint read_uint(std::istream& i, const std::string& prefix, const std::string& sep = "=")
+    {
+        std::string line = read_line(i);
+        auto fields = split(line, sep);
+        assert(fields.size() == 2);
+        assert(prefix == fields[0]);
+        int value = std::stoi(fields[1]);
+        assert(value >= 0);
+        return (uint)value;
+    }
+
+    static void write_uint(std::ostream& o, const std::string& prefix, uint value, const std::string& sep = "=")
+    {
+        o << prefix << " " << sep << " " << value << "\n";
+    }
+
+    // 0 2 1
+    static void read_uint_vector(std::istream& i, Vector<uint>& output, const std::string& sep = " ")
+    {
+        std::string line = read_line(i);
+        auto fields = split(line, sep);
+        // can't exceed allocated size, shall we truncate?
+        assert(output.size() >= fields.size());
+        for(uint j = 0; j < fields.size(); ++j)
+        {
+            int v = std::stoi(fields[j]);
+            assert(v >= 0);
+            output[j] = (uint)v;
+        }
+    }
+
+    template <class T>
+    static void write_vector(std::ostream& o, const Vector<T>& input, const std::string& sep = " ")
+    {
+        for(uint i = 0; i < input.size() - 1; ++i)
+        {
+            o << input[i] << sep;
+        }
+
+        o << input[input.size() - 1] << "\n";
+    }
+
+    // 0.1 0.2 0.1
+    static void read_double_vector(std::istream& i, Vector<double>& output, const std::string& sep = " ")
+    {
+        std::string line = read_line(i);
+        auto fields = split(line, sep);
+        // can't exceed allocated size, shall we truncate?
+        assert(output.size() >= fields.size());
+        for(uint i = 0; i < fields.size(); ++i)
+        {
+            output[i] = std::stod(fields[i]);
+        }
+    }
+
+    // prefix = a b c
+    static std::string read_string(std::istream& i, const std::string& prefix, const std::string& sep = "=")
+    {
+        std::string line = read_line(i);
+        auto fields = split(line, sep);
+        assert(fields.size() == 2);
+        assert(prefix == fields[0]);
+        return fields[1];
+    }
+
+    static void write_string(std::ostream& o, const std::string& prefix, const std::string& value, const std::string& sep = "=")
+    {
+        o << prefix << " " << sep << " " << value << "\n";
+    }
+
+    static void assert_next_line(std::istream& i, const std::string& expected)
+    {
+        std::string line;
+        std::getline(i, line);
+        assert(line == expected);
+    }
+
+    static Str concat(const std::string& prefix, uint id)
+    {
+        std::stringstream str_stream;
+        str_stream << prefix;
+        str_stream << id;
+        return str_stream.str();
     }
 };

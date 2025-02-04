@@ -170,3 +170,86 @@ public:
         x1.euclidean_grad(x2, y, y_grad, x1_grad, x2_grad, true, _first_match_dims, _last_work_dims);
     }
 };
+
+class Append : public BinFunctor
+{
+    uint _dim_to_inc;
+public:
+    Append(uint dim_to_inc = 0) : BinFunctor("Append", 0, 0), _dim_to_inc(dim_to_inc)
+    {
+    }
+
+    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    {
+        x1.append(x2, y, _dim_to_inc);
+    }
+
+    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
+                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    {
+        x1.append_grad(x2, y, y_grad, x1_grad, x2_grad, true, _dim_to_inc);
+    }
+
+};
+
+class EncodeByDict: public BinFunctor
+{
+public:
+    EncodeByDict() : BinFunctor("EncodeByDict", 0, 0)
+    {
+    }
+
+    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    {
+        x1.encode_by_dict(x2, y);
+    }
+
+    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
+                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    {
+        // x1_grad is input tensor, no need to calc grad
+        x1.encode_by_dict_grad(x2, y, y_grad, x2_grad);
+    }
+};
+
+class SearchByDict: public BinFunctor
+{
+    int _padding_id;
+public:
+    SearchByDict(int padding_id = -1) : BinFunctor("SearchByDict", 0, 0), _padding_id(padding_id)
+    {
+    }
+
+    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    {
+        x1.search_by_dict(x2, y, _padding_id);
+    }
+
+    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
+                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    {
+        // x1_grad is target tensor, no need to calc grad
+        x1.search_by_dict_grad(x2, y, y_grad, x2_grad, _padding_id);
+    }
+};  
+
+/*
+class Encode: public BinFunctor
+{
+public:
+    Encode(uint first_match_dims, int last_work_dims) : BinFunctor("Encode", first_match_dims, last_work_dims)
+    {
+    }
+
+    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    {
+        x1.encode(x2, y, _first_match_dims, _last_work_dims);
+    }
+
+    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
+                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    {
+        // TODO: dynamic confirm whether x2_grad needs to calc
+        x1.encode_grad(x2, y, y_grad, x1_grad, x2_grad, true, _first_match_dims, _last_work_dims);
+    }
+};*/

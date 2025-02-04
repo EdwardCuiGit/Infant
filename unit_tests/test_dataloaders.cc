@@ -1,11 +1,11 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/3.network/data_loader.h"
+#include "../inc/4.train/data_loader.h"
 
 class TestDataLoaders: public TestClass
 {
 public:
-    REGISTER_TEST_CASES(test_inmemory_dataloader)
+    REGISTER_TEST_CASES(test_inmemory_dataloader, test_text_file_loader)
 
     static void test_inmemory_dataloader()
     {
@@ -31,5 +31,21 @@ public:
         assert(samples == 0);
         assert(batch.data().vector().equals_to({16, 17, 18, 19}));
         assert(batch.dim().equals_to({1, 2, 2}));
+    }
+
+    static void test_text_file_loader()
+    {
+        /* test.txt fil content
+        123
+        12
+        2
+        */ 
+        TextFileLoader tfl("test.txt", 3);
+        Tensor data;
+        uint samples = tfl.read_next(data, 4);
+        assert(samples == 3);
+        assert(data.data().vector().equals_to({11, 12, 2, 11, 12, 2, 12, 2, 0}));
+        assert(data.dim().equals_to({3, 3}));
+        tfl.reset();
     }
 };

@@ -2,6 +2,9 @@
 #include "unit_test.h"
 #include "../inc/1.functors/functor_graph.h"
 #include "../inc/1.functors/tensor_node.h"
+#include "../inc/2.operators/conv.h"
+#include "../inc/2.operators/fc.h"
+#include "../inc/2.operators/pooling.h"
 
 class TestFunctorGraph : public TestClass
 {
@@ -34,7 +37,7 @@ public:
         0.5*(8+80, 12+84, 20+92, 24+96,    44+116, 48+120, 56+128, 60+132)
         */
 
-        Tensor y1 = x.conv2d(2, 3, 2, 2, 1, 1, 0, 0, 1, false, TensorInit_Types::One);
+        Tensor y1 = Conv2d({2, 3, 2, 2, 1, 1, 0, 0, 1, false, TensorInit_Types::One}).forward(x);
         /*
         52, 60,   52, 60,    52,60,
         76, 84,   76, 84,    76,84,
@@ -50,13 +53,13 @@ public:
         0, 0,     0.25, 0.25,    0.5, 0.5
         */
 
-        Tensor y2 = y1.pool2d(Pooling_Types::Avg, 2, 2);
+        Tensor y2 = Pooling2d({Pooling_Types::Avg, 2, 2}).forward(y1);
         /*
         68, 68, 68,
         212, 212, 212
         */
         /*y2_grad: 0, 1, 2,   0, 1, 2*/
-        Tensor y3 = y2.fc(3, 1, true, TensorInit_Types::Ordinal, TensorInit_Types::One);
+        Tensor y3 = Fc({3, 1, true, TensorInit_Types::Ordinal, TensorInit_Types::One}).forward(y2);
         /*
         205,
         637,
@@ -68,18 +71,18 @@ public:
         // test graph creation
         FunctorGraph &g = FunctorGraph::singleton();
 
-        assert(g._tensors.size() == 16);
+        assert(g._tensors.size() == 15);
         assert(g._tensors[0] == x); 
         assert(g._tensors[6] == y1); // x, col, _k, y, y, y, y(y1)
         assert(g._tensors[10] == y2); // col, y1, y2, y(y2)
-        assert(g._tensors[15] == y3); // _w, y, _b, y, y(y3)
+        assert(g._tensors[14] == y3); // _w, y, _b, y, y(y3)
 
         assert(g._params.size() == 3);
         assert(g._params[0].dim().equals_to({1, 3, 2, 2, 2}));
         assert(g._params[1].dim().equals_to({1, 3}));
         assert(g._params[2].dim().equals_to({1}));
 
-        assert(g._functors.size() == 12);
+        assert(g._functors.size() == 11);
         assert(g._functors[0]->func->type() == "Im2Col");
         assert(g._functors[0]->inputs.size() == 1);
         assert(g._functors[1]->func->type() == "Dot");
@@ -94,12 +97,11 @@ public:
         assert(g._functors[8]->func->type() == "Squeeze");
         assert(g._functors[9]->func->type() == "Dot");
         assert(g._functors[10]->func->type() == "Add");
-        assert(g._functors[11]->func->type() == "Squeeze");
 
         assert(y3.data().vector().equals_to({205, 637}));
         assert(y1.dim().equals_to({2, 3, 2, 2}));
         assert(y2.dim().equals_to({2, 3}));
-        assert(y3.dim().equals_to({2}));
+        assert(y3.dim().equals_to({2, 1}));
         // test second forward with same x
         g.zero_features();
         assert(y3.data().vector().equals_to({}));
@@ -113,7 +115,7 @@ public:
         assert(y3.data().vector().equals_to({205, 637}));
         assert(y1.dim().equals_to({2, 3, 2, 2}));
         assert(y2.dim().equals_to({2, 3}));
-        assert(y3.dim().equals_to({2}));
+        assert(y3.dim().equals_to({2, 1}));
 
         // test backward()
         y3.grad().reset({2}, TensorInit_Types::One);

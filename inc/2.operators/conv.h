@@ -9,10 +9,6 @@ Convolution operators:
 */
 
 // projection op: tensor<N, C, H, W> -> tensor<N, C1, H1, W1>
-class ConvBase : public UnOp
-{
-};
-
 /*Conv2d:
     https://towardsdatascience.com/a-comprehensive-introduction-to-different-types-of-convolutions-in-deep-learning-669281e58215
     supports padding, 
@@ -35,7 +31,8 @@ class ConvBase : public UnOp
         Conv2d1x1: stride == 1, padding == 0, dilation == 1
         TODO: Conv2d3x3: stride == 3
 */
-class Conv2d : public ConvBase
+// note: not supporting config & param save/load
+class Conv2d : public UnOp
 {
 private:
     uint _in_channels, _out_channels, _kernel_x, _kernel_y, _stride_x, _stride_y, _padding_x, _padding_y,
@@ -50,7 +47,7 @@ public:
     Conv2d(uint in_channels, uint out_channels, uint kernel_x = 3, uint kernel_y = 3, uint stride_x = 1, uint stride_y = 1,
            uint padding_x = 0, uint padding_y = 0, /*uint dilation_x = 1, uint dilation_y = 1,*/ uint groups = 1, bool has_bias = true,
            TensorInit_Types k_type = TensorInit_Types::Gaussian, TensorInit_Types b_type = TensorInit_Types::Zero)
-        : _in_channels(in_channels), _out_channels(out_channels), _kernel_x(kernel_x), _kernel_y(kernel_y),
+        : UnOp(nullptr, "Conv2d"), _in_channels(in_channels), _out_channels(out_channels), _kernel_x(kernel_x), _kernel_y(kernel_y),
           _stride_x(stride_x), _stride_y(stride_y), _padding_x(padding_x), _padding_y(padding_y),
           /*_dilation_x(dilation_x), _dilation_y(dilation_y),*/ _groups(groups), _has_bias(has_bias)
     {
@@ -63,18 +60,18 @@ public:
         assert(out_channels % groups == 0);
         _out_channels_per_group = out_channels / groups;
 
-        _k = create_param("k", {groups, _out_channels_per_group, _in_channels_per_group, kernel_y, kernel_x}, k_type);
+        _k = add_param("k", {groups, _out_channels_per_group, _in_channels_per_group, kernel_y, kernel_x}, k_type);
         if (has_bias)
         {
-            _b = create_param("b", {_out_channels_per_group}, b_type);
+            _b = add_param("b", {_out_channels_per_group}, b_type);
         }
     }
 
     // x: [N:batch_size, C:in_channels, H:in_height, W:in_width]
     // y: [N:batch_size, C:out_channels, H: out_height, W:out_width]
-    virtual void forward(const Tensor &x, Tensor &y) const override
+    virtual Tensor forward(const Tensor &x) const override
     {
-        assert(x.shape() == 4);
+        assert(x.shape() >= 4);
         uint batch_size = x.dim()[0], in_channels = x.dim()[1], in_height = x.dim()[2], in_width = x.dim()[3];
         assert(in_channels == _in_channels);
 
@@ -84,7 +81,7 @@ public:
         // k: [groups, out_channels_per_group, in_channels_per_group, kernel_y, kernel_x]
         // use last 3 dim [in_channels_per_group, kernel_y, kernel_x] as one unit for dot
         // use groups as matching dim from col & k, i.e., only matched dim will generate dot
-        y = col.dot(_k, 1, 3);
+        Tensor y = col.dot(_k, 1, 3);
         // note: not using below because harder to add bias
         // _k->dot(y, 1, 3); // [groups, out_channels_per_group, batch_size, out_height, out_width];
         // y: [groups, batch_size, out_height, out_width, out_channels_per_group]
@@ -96,5 +93,6 @@ public:
         // y: [batch_size, groups, out_channels_per_group, out_height, out_width]
         y = y.merge_dim(1, 2);
         // y: [batch_size, out_channels, out_height, out_width]
+        return y;
     }
 };

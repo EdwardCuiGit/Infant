@@ -17,7 +17,7 @@ protected:
     std::string _id; // not used, which is used for visualization
     std::string _type;
     // TODO: this is a waste of memory since the whole env is almost the same for is_train
-    bool _is_train = false; // some operators behave different in train & inference
+    // bool _is_train = false; // some operators behave different in train & inference
 public:
     Functor(const std::string& type) : _type(type)
     {}
@@ -55,9 +55,19 @@ public:
         return _type;
     }
 
-    void set_train(bool yes = true)
+    /*void set_train(bool yes = true)
     {
         _is_train = yes;
+    }*/
+
+    // whether this functor/operator's forward func will manipulate class memeber variables
+    // if is_const is true, we no need to rebuild graph in every iteration; i.e., all the operator parameters are const
+    // one example is Norm, which needs to store mean/var during runtime, so we need to run operator::forward every iteration
+    // note: so far, every operator which has child non const operator, we need to explictly mark it as non const
+    // note: we'd better have compile time check
+    virtual bool is_const() const
+    {
+        return true;
     }
 };
 
