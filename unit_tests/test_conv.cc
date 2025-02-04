@@ -24,7 +24,7 @@ public:
         28, 29, 30, 31
         */
 
-        op.forward(x, y);
+        y = op.forward(x);
 
         assert(y.dim().equals_to({1, 2, 2, 2}));
         assert(y.data().vector().equals_to({234+1, 234+18+1, 306+1, 306+18+1, 234+1, 234+18+1, 306+1, 306+18+1}));

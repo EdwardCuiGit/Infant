@@ -1,33 +1,41 @@
 #pragma once
 #include "predefs.h"
+#include "scalar.h"
 #include <vector>
 #include <initializer_list>
 #include <algorithm>
 #include <functional>
 
 /*
-Array<T> is basic array class, now it inherits std::vector<T>, in long run we could implement our own efficient one
+Array<T> is basic array class, now it has std::vector<T>, in long run we could implement our own efficient one
 */
 template <class T>
-class Array : protected std::vector<T>
+class Array
 {
+private:
+    std::vector<T> _v;
 protected:
     inline T get(uint index) const
     {
         assert(index < this->size());
-        return this->std::vector<T>::operator[](index);
+        return _v[index];
     }
 
     inline void set(const T &e, uint index)
     {
         assert(index < this->size());
-        (*this)[index] = e;
+        _v[index] = e;
     }
 
 public:
-    Array() : std::vector<T>() {}
-    explicit Array(size_t t) : std::vector<T>(t) {}
-    Array(std::initializer_list<T> l) : std::vector<T>(l) {}
+    Array(){}
+    explicit Array(size_t t){
+        _v.resize(t);
+    }
+    Array(std::initializer_list<T> l){
+        if (l.size() > 0)
+            _v = l;
+    }
     virtual ~Array() {clear();} 
 
     // TODO: initial goal for this func is to allocate memory but not init
@@ -43,20 +51,23 @@ public:
 
     /***************************************************************************************************************/
     // set functions
-    inline T &operator[](uint index)
+    inline std::vector<T>::reference operator[](uint index)
     {
-        assert(index < size());
-        return this->std::vector<T>::operator[](index);
+        if (index >= size())
+        {
+            assert(index < size());
+        }
+        return _v[index];
     }
 
     inline typename std::vector<T>::iterator begin()
     {
-        return this->std::vector<T>::begin();
+        return _v.begin();
     }
 
     inline typename std::vector<T>::iterator end()
     {
-        return this->std::vector<T>::end();
+        return _v.end();
     }
 
     void set(uint a1_start, const Array<T> &a2, uint a2_start = 0, int len = -1)
@@ -95,19 +106,28 @@ public:
         return *this;
     }
 
-    inline void push_back(T &&e)
+    inline Array<T>& push_back(const T &e)
     {
-        return this->std::vector<T>::push_back(e);
-    }
-
-    inline void push_back(T &e)
-    {
-        return this->std::vector<T>::push_back(e);
+        _v.push_back(e);
+        return *this;
     }
 
     inline void insert(uint start, const Array<T>& arr)
     {
-        this->std::vector<T>::insert(this->begin() + start, arr.begin(), arr.end());
+        _v.insert(this->begin() + start, arr.begin(), arr.end());
+    }
+
+    inline Array<T>& insert(uint start, const T& e)
+    {
+        _v.insert(this->begin() + start, e);
+        return *this;
+    }
+
+    inline Array<T> clone() const
+    {
+        Array<T> arr;
+        arr.copy(*this);
+        return arr;
     }
 
     void append(const Array<T> &a2, uint start = 0, int len = -1)
@@ -127,7 +147,7 @@ public:
 
     inline virtual void clear()
     {
-        this->std::vector<T>::clear();
+        _v.clear();
     }
 
     inline void erase(uint start, int len = -1)
@@ -135,24 +155,25 @@ public:
         if (len < 0)
         len = size() - start;
 
-        this->std::vector<T>::erase(this->begin() + start, this->begin() + start + len);
+        _v.erase(this->begin() + start, this->begin() + start + len);
     }
 
     /***************************************************************************************************************/
     // get functions, all const
+    inline const T &operator[](uint index) const
+    {
+        assert(index < size());
+        return _v[index];
+    }
+
     inline typename std::vector<T>::const_iterator begin() const
     {
-        return this->std::vector<T>::cbegin();
+        return _v.cbegin();
     }
 
     inline typename std::vector<T>::const_iterator end() const
     {
-        return this->std::vector<T>::cend();
-    }
-
-    inline T operator[](uint index) const
-    {
-        return get(index);
+        return _v.cend();
     }
 
     inline T front() const
@@ -182,30 +203,32 @@ public:
 
     inline bool contains(const T &t) const
     {
-        return std::find(this->std::vector<T>::begin(), this->std::vector<T>::end(), t) != this->std::vector<T>::end();
+        return std::find(_v.begin(), _v.end(), t) != _v.end();
     }
 
     inline uint find(const T &t) const
     {
-        auto iter = std::find(this->std::vector<T>::begin(), this->std::vector<T>::end(), t);
-        return iter - this->std::vector<T>::begin();
+        auto iter = std::find(_v.begin(), _v.end(), t);
+        return iter - _v.begin();
     }
 
     inline uint find(const std::function<bool(const T&)> &func) const
     {
-        auto iter = std::find_if(this->std::vector<T>::begin(), this->std::vector<T>::end(), func);
-        return iter - this->std::vector<T>::begin();
+        auto iter = std::find_if(_v.begin(), _v.end(), func);
+        return iter - _v.begin();
     }
 
     // note: only support numeric T
-    bool equals_to(const Array<T> &a2) const
+    bool equals_to(const Array<T> &a2, T noise_level = 0.00001) const
     {
         if (size() != a2.size())
             return false;
 
         for (uint i = 0; i < size(); ++i)
         {
-            if (!ALMOST_ZERO(get(i) - a2.get(i)))
+            if (get(i) == a2.get(i))
+                continue;
+            if (!Math<double>::almost_equal(get(i), a2.get(i), noise_level))
                 return false;
         }
 
@@ -224,7 +247,7 @@ public:
 
     inline uint size() const
     {
-        return this->std::vector<T>::size();
+        return _v.size();
     }
 
     void print(std::ostream& os = std::cout) const
@@ -278,3 +301,9 @@ public:
         }
     }
 };
+
+/*template <>
+inline std::vector<bool>::reference Array<bool>::operator[](uint index)
+{
+    return _v[index];
+}*/

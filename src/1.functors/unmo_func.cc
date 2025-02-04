@@ -19,13 +19,13 @@ void Divide::forward(const TensorD<double> &x, TensorList &y) const
 {
     TensorDArray<double> y1;
     x.divide(y1, _first_match_dims);
-    y = Tensor::weak_upgrade(y1); //catious: changed y addr here
+    y = Tensor::Weak_Upgrade(y1); //catious: changed y addr here
 }
 
 void Divide::backward(const TensorD<double> &x, const TensorList &y, TensorD<double> &x_grad) const
 {
     TensorDArray<double> y1, y1_grad;
-    Tensor::weak_both_downgrade(y, y1, y1_grad);
+    Tensor::Weak_Both_Downgrade(y, y1, y1_grad);
 
     x.divide_grad(y1, y1_grad, x_grad, _first_match_dims);
 }

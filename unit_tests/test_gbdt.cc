@@ -11,7 +11,7 @@ public:
     {
         Gbdt gbdt;
         Gbdt::GbdtEnsemble model;
-        gbdt.train({}, {}, model);
+        gbdt.train({}, {}, {}, model);
     }
 
     static void test_inference()

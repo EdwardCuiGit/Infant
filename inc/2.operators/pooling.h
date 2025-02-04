@@ -7,6 +7,7 @@ aggregation op: vector[N, I] -> float[N]
 1) max, min, avg
 // TODO: Pooling1d
 */
+// note: not support config/tensor save/load
 class Pooling2d : public UnOp
 {
 private:
@@ -15,15 +16,15 @@ private:
 
 public:
     Pooling2d(Pooling_Types pt, uint kernel_x, uint kernel_y, uint stride_x = 1, uint stride_y = 1, uint padding_x = 0, uint padding_y = 0)
-        : _pt(pt), _kernel_x(kernel_x), _kernel_y(kernel_y), _stride_x(stride_x), _stride_y(stride_y),
+        : UnOp(nullptr, "Pooling2d"), _pt(pt), _kernel_x(kernel_x), _kernel_y(kernel_y), _stride_x(stride_x), _stride_y(stride_y),
           _padding_x(padding_x), _padding_y(padding_y)
     {
     }
 
     // x: [N: batch_size, C, H, W] => y: [batch_size, C, H, W]
-    virtual void forward(const Tensor &x, Tensor &y) const override
+    virtual Tensor forward(const Tensor &x) const override
     {
-        assert(x.shape() == 4);
+        assert(x.shape() >= 4);
         uint batch_size = x.dim()[0], in_channels = x.dim()[1], in_height = x.dim()[2], in_width = x.dim()[3];
 
         // col: {1, batch_size, out_height, out_width, in_channels, kernel_y, kernel_x}
@@ -46,6 +47,6 @@ public:
         }
 
         Tensor y2 = y1.move_forward(4, 1, 2); // y: {1, batch_size, in_channels, out_height, out_width};
-        y = y2.squeeze();
+        return y2.squeeze();
     }
 };

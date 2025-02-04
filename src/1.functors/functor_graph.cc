@@ -1,6 +1,7 @@
 #pragma once
 #include "../../inc/1.functors/functor_graph.h"
 #include "../../inc/1.functors/tensor_node.h"
+#include "../../inc/2.operators/operator_base.h"
 #include <queue>
 
 // the graph is built by add(), and link input tensors into the graph, and no need to add_tensor directly to the graph
@@ -93,7 +94,7 @@ void FunctorGraph::print(std::ostream &os) const
     {
         if (t.is_print())
         {
-            t.print(os);
+            // t.print(os);
             //os << "\n";
         }
     }
@@ -101,6 +102,7 @@ void FunctorGraph::print(std::ostream &os) const
 
 void FunctorGraph::forward(const TensorList &x, TensorList &y) const
 {
+    assert(false);
     y = this->forward(x);
 }
 
@@ -116,6 +118,8 @@ TensorList FunctorGraph::forward(const TensorList &x) const
     // TODO: traverse the whole graph, only execute these whose inputs are ready, no need to consider parameters tensor
     forward_traverse([](FunctorNode &node) -> void {
         PFunctor func = node.func;
+        if (Environment::Is_Print_Functor())
+            LOG_INFO("Forward functor:" << func->type());
         func->forward(node.inputs, node.outputs);
         // TODO: no need to run loss ops in inference stage
         // TODO: this support multiple losses
@@ -244,8 +248,20 @@ void FunctorGraph::backward(const TensorList& output_tensor_grads)
         }*/
 
         PFunctor func = node.func;
-        // LOG_INFO("Backward functor:" << func->type());
+        if (Environment::Is_Print_Functor())
+            LOG_INFO("Backward functor:" << func->type());
         func->backward(node.inputs, node.outputs);
+        if (Environment::Is_Print_Functor())
+        {
+            double total_grad = 0;
+            for (uint i = 0; i < node.inputs.size(); ++i)
+            {
+                TensorD<double> sum_grad;
+                node.inputs[i].grad().sum(sum_grad);
+                total_grad += sum_grad.first_item();
+            }
+            LOG_INFO("Total grad:" << total_grad);
+        }
     });
 }
 
@@ -267,6 +283,15 @@ void FunctorGraph::backward_traverse(const std::function<void(FunctorNode &)> &f
         status[i] = _functors[i]->down_functors.size();
         if (status[i] == 0)
         {
+            for(uint j = 0; j < _functors[i]->outputs.size(); ++j)
+            {
+                if(_functors[i]->outputs[j].grad().size() == 0)
+                {
+                    _functors[i]->outputs[j].grad().reset(
+                        _functors[i]->outputs[j].dim(), TensorInit_Types::Zero);
+                }
+            }
+
             queue.push(_functors[i].get());
         }
     }

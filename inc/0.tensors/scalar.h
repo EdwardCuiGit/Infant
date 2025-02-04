@@ -7,6 +7,28 @@ template <class T>
 class Math
 {
 public:
+    inline static bool almost_equal(T e1, T e2, T noise_level = 0.00001)
+    {
+        if (e1 == e2)
+            return true;
+        T diff = e1 - e2;
+        if (diff <= noise_level && diff >= -noise_level)
+            return true;
+        return false;
+    }
+
+    inline static void assert_almost_equal(T e1, T e2, T noise_level = 0.00001)
+    {
+        assert(almost_equal(e1, e2, noise_level));
+    }
+
+    inline static bool almost_zero(T e, T noise_level = 0.00001)
+    {
+        if (noise_level < 0) noise_level = -noise_level;
+
+        return e <= noise_level && e >= -noise_level;
+    }
+
     inline static void swap(T &e1, T &e2)
     {
         T tmp;
@@ -30,7 +52,6 @@ public:
         return x > 0 ? 1 : 0;
     }
 
-
     inline static T sigmoid(T x)
     {
         return 1.0 / (1.0 + std::exp(-1.0 * x));
@@ -38,20 +59,20 @@ public:
 
     inline static T sigmoid_grad(T x, T y)
     {
-        //return y * y * std::exp(-1.0 * x);
+        // return y * y * std::exp(-1.0 * x);
         return y * (1 - y);
     }
 
     inline static T tanh(T x)
     {
-        //return 2 * sigmoid(2 * x) - 1;
+        // return 2 * sigmoid(2 * x) - 1;
         return 2.0 / (1.0 + std::exp(-2.0 * x)) - 1;
     }
 
     inline static T tanh_grad(T x, T y)
     {
-        //return 2 * -1 * ((y+1)/2) ^ 2 * std::exp(-2.0 * x) * -2;
-        //return (y+1) * (y+1) * std::exp(-2.0 * x);
+        // return 2 * -1 * ((y+1)/2) ^ 2 * std::exp(-2.0 * x) * -2;
+        // return (y+1) * (y+1) * std::exp(-2.0 * x);
         return 1 - y * y;
     }
 

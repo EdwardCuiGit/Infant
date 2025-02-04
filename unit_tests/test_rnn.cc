@@ -15,9 +15,7 @@ public:
         /*
         seq-0: 0,1,  2,3,  4,5
         */
-        TensorList y;
-
-        rnn.forward({x}, y);
+        TensorList y = rnn.forward({x});
         assert(y.size() == 2);
         assert(y[1].dim().equals_to({1, 3, 1}));
         assert(y[1].data().vector().equals_to({3, 24, 99}));
@@ -36,9 +34,7 @@ public:
         /*
         seq-0: 0,1,  2,3,  4,5
         */
-        TensorList y;
-
-        rnn.forward({x}, y);
+        TensorList y = rnn.forward({x});
         assert(y.size() == 2);
         assert(y[1].dim().equals_to({1, 3, 2}));
         assert(y[1].data().vector().equals_to({1, 1, 7*56, 7*56, (9+14*56)*(9+14*56)*(56+9+14*56), (9+14*56)*(9+14*56)*(56+9+14*56)}));
@@ -56,9 +52,7 @@ public:
         /*
         seq-0: 0,1,  2,3,  4,5
         */
-        TensorList y;
-
-        rnn.forward({x}, y);
+        TensorList y = rnn.forward({x});
         assert(y.size() == 2);
         assert(y[1].dim().equals_to({1, 3, 2}));
         assert(y[1].data().vector().equals_to({1, 1, 43, 43, 95*95-94*43, 95*95-94*43}));

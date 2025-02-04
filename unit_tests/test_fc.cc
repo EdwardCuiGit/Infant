@@ -9,10 +9,10 @@ public:
 
     static void test_forward()
     {
-        Fc op(3, 2, true, TensorInit_Types::One, TensorInit_Types::One);
+        Fc op({3, 2, true, TensorInit_Types::One, TensorInit_Types::One});
         Tensor x({2, 3}, TensorInit_Types::Ordinal), y;
 
-        op.forward(x, y);
+        y = op.forward(x);
         assert(y.dim().equals_to({2, 2}));
         assert(y.data().vector().equals_to({4, 4, 13, 13}));
     }

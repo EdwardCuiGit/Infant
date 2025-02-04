@@ -67,7 +67,7 @@ class TensorD
     friend class TestFc;
     friend class TestConv;
     friend class TestPooling;
-    friend class TestTransformer;
+    friend class TestAttention;
     friend class TestRnn;
     friend class TestNorm;
     friend class TestFunctorGraph;
@@ -121,12 +121,17 @@ public:
         this->reset(dim, t);
     }
 
+    explicit TensorD(const Vector<uint> &dim, const Vector<T>& vector) : TensorD()
+    {
+        this->reset(dim, vector);
+    }
+
     TensorD(const TensorD<T> &x2) : TensorD()
     {
         this->weak_copy(x2);
     }
 
-    TensorD<T> &reset(const Vector<uint> &dim, TensorInit_Types t = TensorInit_Types::None)
+    TensorD<T> &reset(const Vector<uint> &dim, const Vector<T>& vector)
     {
         assert(dim.all_pos());
         if (this->size() != dim.product()) // if total size is the same, no need to re-alloc memory, but the data is random
@@ -140,15 +145,103 @@ public:
             this->_dim->copy(dim);
         }
 
-        _vector->init(t);
+        assert(this->_vector->size() == vector.size());
+        this->_vector->set(0, vector);
         return *this;
     }
 
-    // perf: if copy from same shape tensor, no need to clear() and init();
-    TensorD<T> &deep_copy(const TensorD<T> &x2)
+    TensorD<T> &reset(const Vector<uint> &dim, TensorInit_Types t = TensorInit_Types::None)
     {
-        this->reset(x2.dim());
-        this->_vector->set(0, *x2._vector);
+        //assert(dim.all_pos());
+        if (this->size() != dim.product()) // if total size is the same, no need to re-alloc memory, but the data is random
+        {
+            this->_vector = std::make_shared<Vector<T>>();
+            this->_vector->reserve(dim.product());
+        }
+
+        if (!this->_dim->equals_to(dim)) // over-optimize, equals_to also spend time
+        {
+            this->_dim->copy(dim);
+        }
+
+
+        if (t == TensorInit_Types::LEFT_LOWER_ONE)
+        {
+            /*
+            1,
+            1,1,
+            1,1,1
+            */
+            assert(dim.size() == 2);
+            assert(dim[0] == dim[1]);
+            for (uint i = 0; i < dim[0]; ++i)
+            for (uint j = 0; j < dim[1] ; ++j)
+            {
+                (*_vector)[i * dim[0] + j] = (j <= i ? 1 : 0); 
+            }
+        }
+        else if (t == TensorInit_Types::RIGHT_HIGHER_NEG_INF)
+        {
+            /*
+            0, -inf, -inf,
+            0, 0,    -inf,
+            0, 0,       0
+            */
+            assert(dim.size() == 2);
+            assert(dim[0] == dim[1]);
+            for (uint i = 0; i < dim[0]; ++i)
+            for (uint j = 0; j < dim[1] ; ++j)
+            {
+                (*_vector)[i * dim[0] + j] = (j <= i ? 0 : INF_NEG); 
+            }
+        }
+        else
+        {
+            _vector->init(t);
+        }
+
+        return *this;
+    }
+
+    // this is to deep copy x2 by n times to *this
+    // perf: if copy from same shape tensor, no need to clear() and init();
+    TensorD<T> &deep_copy(const TensorD<T> &x2, uint n = 1)
+    {
+        if (n == 1)
+        {
+            if (&x2 == this || x2._vector == this->_vector)
+            {
+                return *this;
+            }
+
+            this->reset(x2.dim());
+            this->_vector->set(0, *x2._vector);
+        }
+        else
+        {
+            if (&x2 == this || x2._vector == this->_vector) // special logic for copy itself
+            {
+                this->_dim->insert(0, n);
+                Vector<T> clone;
+                clone.copy(this->vector());
+                this->_vector = std::make_shared<Vector<T>>();
+                this->_vector->reserve(this->size());
+                for (uint i = 0; i < n; ++i) 
+                {
+                    this->_vector->set(this->size() / n * i, clone, 0, this->size() / n);
+                }
+
+                return *this;
+            }
+
+            auto new_dim = Vector<uint>(this->dim().clone().insert(0, n));
+            this->reset(new_dim);
+            for (uint i = 0; i < n; ++i) 
+            {
+                this->_vector->set(this->size() / n * i, *x2._vector, 0, this->size() / n);
+            }
+        }
+
         return *this;
     }
 
@@ -165,6 +258,37 @@ public:
         this->_dim->copy(x2.dim());
         this->_vector = x2._vector;
         return *this;
+    }
+
+    // this function is pair function of save, pls change together
+    NOTEST inline void load(std::istream& i)
+    {
+        this->clear();
+
+        StringUtil::assert_next_line(i, "start of tensor data");
+        uint shape_value = StringUtil::read_uint(i, "shape");
+        assert(shape_value > 0);
+
+        this->_dim->reserve(shape_value);
+        StringUtil::read_uint_vector(i, *this->_dim);
+
+        assert(this->shape() == shape_value);
+
+        this->vector().reserve(this->size());
+        StringUtil::read_double_vector(i, this->vector());
+
+        StringUtil::assert_next_line(i, "end of tensor data");
+    }
+
+    NOTEST inline void save(std::ostream& o) const
+    {
+        o << "start of tensor data\n";
+        StringUtil::write_uint(o, "shape", this->shape());
+        StringUtil::write_vector(o, this->dim());
+
+        StringUtil::write_vector(o, this->vector());
+
+        o << "end of tensor data\n";
     }
 
 #ifdef DISABLED
@@ -280,6 +404,25 @@ public:
 
         return size;
     }
+
+    bool equals_to(const TensorD<T>& x, T noise_level = 0.00001) const
+    {
+        if (!this->dim().equals_to(x.dim()))
+        return false;
+
+        return this->vector().equals_to(x.vector(), noise_level);
+    }
+
+    bool equals_to(const Vector<uint>& dim, const Vector<T>& vector, T noise_level = 0.00001) const
+    {
+        if (!this->dim().equals_to(dim))
+        {
+            return false;
+        }
+
+        return this->vector().equals_to(vector, noise_level);
+    }
+
 #pragma endregion
 private:
 #pragma region binary_maps
@@ -548,7 +691,7 @@ public: // below are public bin_map ops
                                x2, y, y_grad, x1_grad, x2_grad, enable_x2_grad, first_match_dims, last_work_dims);
     }
 
-    // mul op: y[i] [+]= alpha * x1[i] * x2[i] + beta; Hamard product
+    // mul op: y[i] = alpha * x1[i] * x2[i] + beta; Hamard product
     TensorD<T> &mul(const TensorD<T> &x2, TensorD<T> &y, T alpha = 1.0, T beta = 0.0,
                     uint first_match_dims = 0, int last_work_dims = -1) const
     {
@@ -653,7 +796,7 @@ public: // below are public bin_reduce ops
     BIN_REDUCE_GRAD(euclidean_grad, [](T xe1, T xe2, T ye, T &xe1_grad, T &xe2_grad) -> void
                     {
                         assert(xe2 > 0);
-                        if (ALMOST_ZERO(ye)){
+                        if (Math<double>::almost_zero(ye)){
                             xe1_grad = xe2_grad = 0;
                         }
                         else
@@ -833,6 +976,22 @@ public:
                          y, y_grad, x1_grad, last_work_dims);
     }
 
+    // y = ln(x + bias)
+    TensorD<T> &ln(TensorD<T> &y, double bias = 0, int last_work_dims = -1) const
+    {
+        return _map([bias](T ex) -> T
+                    { return std::log(ex + bias); },
+                    y, last_work_dims);
+    }
+
+    TensorD<T> &ln_grad(const TensorD<T> &y, const TensorD<T> &y_grad, TensorD<T> &x1_grad,
+                         double bias = 0, int last_work_dims = -1) const
+    {
+        return _map_grad([bias](T ex, T ey) -> T
+                         { return 1 / (ex + bias); },
+                         y, y_grad, x1_grad, last_work_dims);
+    }
+
     /*MAP(
         pow, [n](T x) -> T
         { return std::pow(x, n) },
@@ -843,7 +1002,7 @@ public:
         { return x != 0 ? n * y / x : 0; },
         double n)*/
 
-    // y[i] = exp(x[i]) / sum(exp(x[i]))
+    // y[i] = exp(x[i] - max(x[i])) / sum(exp(x[i] - max(x[i])))
     // TODO: use low level map to implement
     TensorD<T> &softmax(TensorD<T> &y, int last_work_dims = -1) const
     {
@@ -867,6 +1026,7 @@ public:
     }
 
     // not-used: x1(this)
+    // note: even subtract by max(x[i]), the grad is still the same
     // d(y/x) = (xdy - ydx) / x^2
     //  dy_j/dx_i = exp(x_j) * -1 * sum(k, exp(x_k))^2 * exp(x_i) = -1 * y_i * y_j if i != j;
     //  dy_i/dx_i = (sum(exp(x_k)) * exp(x_i) - exp(x_i) * exp(x_i)) / sum(exp(x_i))^2 = y_i * (1 - y_i)
@@ -1585,7 +1745,7 @@ public:
         return y;
     }
 
-    static void combine_grad(const TensorDArray<T> &x, const TensorD<T> &y, const TensorD<T> &y_grad,
+    static void Combine_Grad(const TensorDArray<T> &x, const TensorD<T> &y, const TensorD<T> &y_grad,
                              TensorDArray<T> &x_grad, const Vector<uint> &first_dims = {})
     {
         uint size = x.size();
@@ -1630,7 +1790,7 @@ public:
             dims.push_back(this->dim()[i]);
         }
 
-        y.dim().copy(dims);
+        y._dim->copy(dims);
 
         y._vector = this->_vector;
 
@@ -1719,6 +1879,7 @@ public:
         return x_grad;
     }
 
+    // copy subset of data from y, starting from offset, copying size of dim.product()
     TensorD<T> &subset(TensorD<T>& y, const Vector<uint>& dim, uint offset) const
     {
         uint size = dim.product();
@@ -1750,8 +1911,367 @@ public:
         return x_grad;
     }
 
+    // this is to merge several dims
+    // e.g., merge(1, 1), [batch_size, multi_head, node_len, output_dim] => [batch_size, node_len, output_dim]
+    /* inputs: [2, 2, 4, 3]
+    0,0,0, 1,1,1, 2,2,2, 3,3,3,
+    0,0,0, 1,1,1, 2,2,2, 3,3,3,
+
+    0,0,0, 1,1,1, 2,2,2, 3,3,3,
+    0,0,0, 1,1,1, 2,2,2, 3,3,3,
+
+    outputs: [2, 4, 3]
+    0,0,0, 2,2,2, 4,4,4, 6,6,6,
+
+    0,0,0, 2,2,2, 4,4,4, 6,6,6,
+    */
+   // TODO: we can implement this faster by not calling move_forward & sum
+    /*NOTEST TensorD<T> &merge(TensorD<T>& y, uint from, uint len) const{
+    // so far use move_forward & sum to implement
+        TensorD<T> z;
+        this->move_forward(z, from, len, this->shape());
+        return z.sum(y, len);
+    }*/
+
+    // use-case-2: {batch_size, node_len}.encode{batch_size, node_len, dict_size} => {batch_size, node_len} => get target prob
+    //    encode__(x2, y, 2)
+
+    // [x, y, z, ...].encode({dict_size, input_dim}) => [x, y, z, ..., input_dim]
+    TensorD<T> &encode_by_dict(const TensorD<T>& dict, TensorD<T> &y) const
+    {
+        assert(dict.shape() == 2);
+        uint dict_size = dict.dim()[0];
+        uint input_dim = dict.dim()[1];
+
+        Vector<uint> new_dim = this->dim();
+        new_dim.push_back(input_dim);
+        y.reset(new_dim);
+
+        for (uint i = 0; i < this->size(); ++i)
+        {
+            uint dict_id = this->vector()[i];
+            assert(dict_id < dict_size);
+            y.vector().add_(dict.vector(), i * input_dim, dict_id * input_dim, input_dim);   
+        }
+
+        return y;
+    }
+
+    TensorD<T> &encode_by_dict_grad(const TensorD<T>& dict, const TensorD<T> &y, const TensorD<T> &y_grad, 
+    TensorD<T>& dict_grad) const
+    {
+        assert(dict.shape() == 2);
+        uint dict_size = dict.dim()[0];
+        uint input_dim = dict.dim()[1];
+
+        if (!dict_grad.dim().equals_to(dict.dim()))
+        {
+            dict_grad.reset(dict.dim(), TensorInit_Types::Zero);
+        }
+
+        for (uint i = 0; i < this->size(); ++i)
+        {
+            uint dict_id = this->vector()[i];
+            assert(dict_id < dict_size);
+            dict_grad.vector().add_(y_grad.vector(), dict_id * input_dim, i * input_dim, input_dim);
+        }
+
+        return dict_grad;
+    }
+
+    // use-case-2: {batch_size, node_len}.encode{batch_size, node_len, dict_size} => {batch_size, node_len} => get target prob
+    //    encode__(x2, y, 2)
+
+    // [x, y, z, ...].search({x, y, z, ..., dict_size}) => [x, y, z, ...]
+    TensorD<T> &search_by_dict(const TensorD<T>& dict, TensorD<T> &y, int padding_id = -1) const
+    {
+        assert(dict.shape() == this->shape() + 1);
+        assert(dict.dim().match_bottom(this->dim(), this->shape(), false));
+        uint dict_size = dict.dim()[dict.shape() - 1];
+
+        y.reset(this->dim());
+
+        for (uint i = 0; i < this->size(); ++i)
+        {
+            uint dict_id = this->vector()[i];
+            assert(dict_id < dict.size());
+            if (padding_id >= 0 && dict_id == padding_id)
+                y[i] = 0; // no confidence for padding
+            else
+                y[i] = dict[i * dict_size + dict_id];
+        }
+
+        return y;
+    }
+
+    // [x, y, z, ...].search({x, y, z, ..., dict_size}) => [x, y, z, ...]
+    TensorD<T> &search_by_dict_grad(const TensorD<T>& dict, const TensorD<T> &y, const TensorD<T> &y_grad, 
+    TensorD<T>& dict_grad, int padding_id = -1) const
+    {
+        assert(dict.shape() == this->shape() + 1);
+        uint dict_size = dict.dim()[dict.shape() - 1];
+
+        if (!dict_grad.dim().equals_to(dict.dim()))
+        {
+            dict_grad.reset(dict.dim(), TensorInit_Types::Zero);
+        }
+
+        for (uint i = 0; i < this->size(); ++i)
+        {
+            uint dict_id = this->vector()[i];
+            assert(dict_id < dict_size);
+            if (padding_id >= 0 && dict_id == padding_id)
+            {
+                dict_grad.vector()[padding_id * dict_size] = 0;
+            }
+            else
+            {
+                dict_grad.vector()[i * dict_size + dict_id] = y_grad[i];
+            }
+        }
+
+        return dict_grad;
+    }
+
+    /*// TensorD<T> &merge_grad(const TensorD<T> &y, const TensorD<T> &y_grad, TensorD<T> &x_grad, uint from, uint len) const
+
+    // use-case-1: {batch_size, node_len}.encode{dict_size, input_dim} => {batch_size, node_len, input_dim} => input encoding
+    //    encode__(x2, y, 0)
+    // use-case-2: {batch_size, node_len}.encode{batch_size, node_len, dict_size} => {batch_size, node_len} => get target prob
+    //    encode__(x2, y, 2)
+
+    // first_match_dims must be dim order of dict_size in x2
+    TensorD<T> &encode(const TensorD<T>& x2, TensorD<T> &y, uint first_match_dims = 0) const
+    {
+        assert(first_match_dims <= this->shape());
+
+        // this is to ensure encode can only output one value or one vector, not multi dims
+        assert(first_match_dims == x2.shape() - 2 || first_match_dims == x2.shape() - 1);
+        uint dict_size = x2.dim()[first_match_dims];
+
+        uint group_size = this->dim_to_size(0, first_match_dims);
+        assert(x2.dim().match_bottom(this->dim(), first_match_dims, false));
+
+        uint x2_last_size = x2.size() / group_size / dict_size; // for case-1, it's input_dim, for case-2, it's 1
+        Vector<uint> y_dim;
+        if (first_match_dims == 0)
+            y_dim.copy(this->dim());
+        else
+        {
+            for (uint i = 0; i < first_match_dims; ++i)
+                y_dim.push_back(x2.dim()[i]);
+        }
+
+        if (x2_last_size > 1)
+            y_dim.push_back(x2_last_size);
+
+        y.reset(y_dim);
+
+        uint y_offset = 0;
+        for (uint group_i = 0; group_i < group_size; ++group_i)
+        {
+            uint left_group_start = group_i * this->size() / group_size;
+            for (uint left_i = 0; left_i < this->size() / group_size; ++left_i)
+            {
+                uint left_offset = left_group_start + left_i;
+                uint dict_id = this->vector()[left_offset];
+                // x1's value needs to <= dict_size
+                assert(dict_id < dict_size);
+
+                uint right_group_start = group_i * x2.size() / group_size;
+                uint right_offset = right_group_start + dict_id * x2_last_size;
+                for (uint output_i = 0; output_i < x2_last_size; ++output_i)
+                {
+                    y[y_offset++] = x2[right_offset++];
+                }
+            }
+        }
+
+        return y;
+    }
+
+    // use-case-2: {batch_size, node_len}.encode{batch_size, node_len, dict_size} => {batch_size, node_len} => get target prob
+    //    encode__(x2, y, 2)
+    NOTEST TensorD<T> &encode_grad(const TensorD<T>& x2, const TensorD<T> &y, const TensorD<T>& y_grad, TensorD<T>& x1_grad, TensorD<T>& x2_grad,
+    uint first_match_dims = 0, bool has_x2_grad = true) const
+    {
+        assert(first_match_dims <= this->shape());
+
+        // this is to ensure encode can only output one value or one vector, not multi dims
+        assert(first_match_dims == x2.shape() - 2 || first_match_dims == x2.shape() - 1);
+        uint dict_size = x2.dim()[first_match_dims];
+
+        uint group_size = this->dim_to_size(0, first_match_dims);
+        assert(x2.dim().match_bottom(this->dim(), first_match_dims, false));
+
+        uint x2_last_size = x2.size() / group_size / dict_size; // for case-1, it's input_dim, for case-2, it's 1
+
+        if (!x1_grad.dim().equals_to(this->dim()))
+        {
+            x1_grad.reset(this->dim(), TensorInit_Types::Zero);
+        }
+
+        if (!x2_grad.dim().equals_to(x2.dim()) && has_x2_grad)
+        {
+            x2_grad.reset(x2.dim(), TensorInit_Types::Zero);
+        }
+
+        uint y_offset = 0;
+        for (uint group_i = 0; group_i < group_size; ++group_i)
+        {
+            uint left_group_start = group_i * this->size() / group_size;
+            for (uint left_i = 0; left_i < this->size() / group_size; ++left_i)
+            {
+                uint left_offset = left_group_start + left_i;
+                uint dict_id = this->vector()[left_offset];
+                // x1's value needs to <= dict_size
+                assert(dict_id < dict_size);
+
+                uint x2_grad_offset = group_i * x2.size() / group_size + dict_id * x2_last_size;
+                x2_grad[x2_grad_offset] = y_grad[left_group_start];
+            }
+        }
+
+        return x2_grad;
+    }*/
+
+    // this is convert the id with max value in dict_size to be id
+    // treat the last dim size as dict_size, and find the max value of the dim, and assign the id with max value
+    // last dim will reduce to one scalar value
+    NOGRAD TensorD<T>& decode__(TensorD<T>& y) const
+    {
+        assert(this->shape() >= 1);
+        uint dict_size = this->dim()[this->shape() - 1];
+        y.reset(Vector(this->dim().subset(0, this->shape() - 1)));
+        if (y.shape() == 0)
+        {
+            y.reset({1});
+        }
+
+        for (uint i = 0; i < y.size(); ++i)
+        {
+            T max = this->vector()[i * dict_size];
+            uint max_id = 0;
+            for (uint j = 1; j < dict_size; ++j)
+            {
+                T value = this->vector()[i * dict_size + j];
+                if (value > max)
+                {
+                    max = value;
+                    max_id = j;
+                }
+            }
+
+            y[i] = max_id;
+        }
+
+        return y;
+    }
+
+    void append(const TensorD<T>& x2, TensorD<T>& y, uint dim_to_inc = 0) const
+    {
+        y.deep_copy(*this);
+        if (this->shape() > 0)
+        {
+            assert(dim_to_inc + x2.shape()  + 1 == this->shape());
+            y.vector().append(x2.vector());
+            y.dim()[dim_to_inc] += 1;
+        }
+        else
+        {
+            assert(dim_to_inc == 0);
+            y.deep_copy(x2, 1);
+            y.dim().insert(0, 1);
+        }
+    }
+
+    void append_grad(const TensorD<T>& x2, const TensorD<T>& y, const TensorD<T>& y_grad, TensorD<T>& x1_grad, 
+    TensorD<T>& x2_grad, bool enable_x2_grad = true, uint dim_to_inc = 0) const
+    {
+        if (!x1_grad.dim().equals_to(this->dim()))
+            x1_grad.reset(this->dim(), TensorInit_Types::Zero);
+
+        if (enable_x2_grad && !x2_grad.dim().equals_to(x2.dim()))
+            x2_grad.reset(x2.dim(), TensorInit_Types::Zero);
+
+        if (this->shape() > 0)
+        {
+            assert(dim_to_inc + x2.shape()  + 1 == this->shape());
+            x1_grad.vector().set(0, y_grad.vector(), 0, x1_grad.size());
+            if (enable_x2_grad)
+                x2_grad.vector().set(0, y_grad.vector(), x1_grad.size(), x2_grad.size());
+        }
+        else
+        {
+            assert(dim_to_inc == 0);
+            if (enable_x2_grad)
+                x2_grad.vector().set(0, y_grad.vector(), x1_grad.size(), x2_grad.size());
+        }
+    }
+
+    TensorD<T> &map(TensorD<T>& y, const std::function<double(double)>& func) const
+    {
+        y.reset(this->dim());
+        this->vector().map(func, y.vector());
+        
+        return y;
+    }
+
+    TensorD<T> &map_grad(const TensorD<T>& y, const TensorD<T>& y_grad, TensorD<T>& x_grad, 
+    const std::function<double(double)>& func_grad) const
+    {
+        if (!x_grad.dim().equals_to(this->dim()))
+            x_grad.reset(this->dim(), TensorInit_Types::Zero);
+
+        TensorD<T> x_grad_tmp(this->dim(), TensorInit_Types::Zero);
+        TensorD<T> x_grad_tmp1(this->dim(), TensorInit_Types::Zero);
+        this->vector().map(func_grad, x_grad_tmp.vector());
+
+        y_grad.dot(x_grad_tmp, x_grad_tmp1, this->shape(), 0);
+
+        x_grad.add(x_grad_tmp1, x_grad, 1, 1, 0, this->shape(), 0);
+
+        return x_grad;
+    }
+
+    TensorD<T> &map(TensorD<T>& y, 
+    const std::function<void(const Vector<double>&, uint, uint, Vector<double>&)>& func, uint first_match_dims = 0) const
+    {
+        y.reset(this->dim());
+        assert(first_match_dims <= this->shape());
+        uint group_count = this->dim_to_size(0, first_match_dims);
+        uint group_size = this->size() / group_count;
+        for (uint i = 0; i < group_count; ++i)
+        {
+            uint group_start = i * group_size;
+            uint group_end = group_start + group_size;
+            func(this->vector(), group_start, group_size, y.vector());
+        }
+        
+        return y;
+    }
+
+    TensorD<T> &map_grad(const TensorD<T>& y, const TensorD<T>& y_grad, TensorD<T>& x_grad, 
+    const std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)>& func_grad, uint first_match_dims = 0) const
+    {
+        if (!x_grad.dim().equals_to(this->dim()))
+            x_grad.reset(this->dim(), TensorInit_Types::Zero);
+
+        uint group_count = this->dim_to_size(0, first_match_dims);
+        uint group_size = this->size() / group_count;
+        for (uint i = 0; i < group_count; ++i)
+        {
+            uint group_start = i * group_size;
+            uint group_end = group_start + group_size;
+            func_grad(this->vector(), group_start, group_size, y_grad.vector(), x_grad.vector());
+        }
+
+        return x_grad;
+    }
+
 #pragma endregion
 };
 
 // template<> class TensorD<double>;
 // template<> class TensorD<int>
+

@@ -5,7 +5,9 @@
 class TestTensor : public TestClass
 {
 public:
-    REGISTER_TEST_CASES(test_create, test_add, test_mul, test_dot, test_mse, test_ce, test_euclidean, test_linear, test_sqrt, test_pow, test_softmax, test_activation, test_sum, test_avg, test_var, test_max, test_min, test_swap, test_move_forward, test_im2col, test_im2col_grad, test_merge_dim, test_divide, test_combine, test_inflate, test_squeeze, test_subset);
+    REGISTER_TEST_CASES(test_create, test_add, test_mul, test_dot, test_mse, test_ce, test_euclidean, test_linear, test_sqrt, test_pow, test_softmax, test_activation, test_sum, test_avg, test_var, test_max, test_min, test_swap, test_move_forward, test_im2col, test_im2col_grad, test_merge_dim, test_divide, test_combine, test_inflate, test_squeeze, test_subset,
+                        test_deep_copy, test_equals_to, test_encode_by_dict, test_search_by_dict, test_decode, test_load, test_save, test_append,
+                        test_map);
 
     static void test_create()
     {
@@ -27,6 +29,12 @@ public:
         assert(x3.size_to_dim(5, false) == 1);
         x3.clear();
         assert(x3.size() == 0);
+
+        TensorD<double> x4({3, 3}, TensorInit_Types::LEFT_LOWER_ONE);
+        assert(x4._vector->equals_to({1, 0, 0, 1, 1, 0, 1, 1, 1}));
+
+        TensorD<double> x5({3, 3}, TensorInit_Types::RIGHT_HIGHER_NEG_INF);
+        assert(x5._vector->equals_to({0, INF_NEG, INF_NEG, 0, 0, INF_NEG, 0, 0, 0}));
 
         /* disabled as this func is disabled
         x3.deep_copy(x2, 15, 15, {5, 3});
@@ -136,12 +144,12 @@ public:
         x2.vector().set(0, {0.2, 0.2, 0.3, 0.4, 0.1});
 
         x1.ce(x2, y);
-        assert_almost_equal(y[0], 4.04548557050879);
+        Math<double>::assert_almost_equal(y[0], 4.04548557050879);
 
         x1.ce_grad(x2, y, y_grad, x1_grad, x2_grad, true);
         // x1_grad all values is log2(x2[j]), x2_grad all values is x1[i] /(x2[i]) / std::log(2)
         assert(x1_grad.vector().equals_to({-std::log2(x2[0]), -std::log2(x2[1]), -std::log2(x2[2]), -std::log2(x2[3]), -std::log2(x2[4])}));
-        assert(x2_grad.vector().equals_to({-x1[0]/x2[0]/std::log(2.0),-x1[1]/x2[1]/std::log(2.0), -x1[2]/x2[2]/std::log(2.0), -x1[3]/x2[3]/std::log(2.0), -x1[4]/x2[4]/std::log(2.0)}));
+        assert(x2_grad.vector().equals_to({-x1[0] / x2[0] / std::log(2.0), -x1[1] / x2[1] / std::log(2.0), -x1[2] / x2[2] / std::log(2.0), -x1[3] / x2[3] / std::log(2.0), -x1[4] / x2[4] / std::log(2.0)}));
     }
 
     static void test_euclidean()
@@ -151,12 +159,12 @@ public:
         x2.vector().set(0, {4, 3, 2, 1});
 
         x1.euclidean(x2, y);
-        ALMOST_ZERO(y[0] - std::sqrt(27));
+        Math<double>::assert_almost_equal(y[0], std::sqrt(27));
 
         x1.euclidean_grad(x2, y, y_grad, x1_grad, x2_grad, true);
         // grad: dy_dx1 = 0.5 / y * 2 * (x1[j] - x2[j]), dy_dx2 = -dy_dx1
-        assert(x1_grad.vector().equals_to({(x1[0] - x2[0])/y[0], (x1[1] - x2[1]) / y[0], 
-            (x1[2] - x2[2])/ y[0], (x1[3] - x2[3])/y[0]}));
+        assert(x1_grad.vector().equals_to({(x1[0] - x2[0]) / y[0], (x1[1] - x2[1]) / y[0],
+                                           (x1[2] - x2[2]) / y[0], (x1[3] - x2[3]) / y[0]}));
         assert(x2_grad.vector().equals_to({-x1_grad[0], -x1_grad[1], -x1_grad[2], -x1_grad[3]}));
     }
 
@@ -511,7 +519,7 @@ public:
         y_grad[1].reset({3, 2}, TensorInit_Types::One);
         x.divide_grad(y, y_grad, x_grad);
         assert(x_grad.dim().equals_to({2, 3, 2}));
-        assert(x_grad.vector().equals_to(Vector<double>::one(12)));
+        assert(x_grad.vector().equals_to(Vector<double>::One(12)));
     }
 
     static void test_combine()
@@ -526,10 +534,10 @@ public:
         assert(y.dim().equals_to({2, 3, 2}));
         assert(y.vector().equals_to({0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5}));
         y_grad.reset({2, 3, 2}, TensorInit_Types::One);
-        TensorD<double>::combine_grad(x, y, y_grad, x_grad);
+        TensorD<double>::Combine_Grad(x, y, y_grad, x_grad);
         assert(x_grad.size() == 2);
         assert(x_grad[1].dim().equals_to({3, 2}));
-        assert(x_grad[1].vector().equals_to(Vector<double>::one(6)));
+        assert(x_grad[1].vector().equals_to(Vector<double>::One(6)));
     }
 
     static void test_inflate()
@@ -557,7 +565,7 @@ public:
         x.subset(y, {1, 2, 2}, 0);
         assert(y.vector().equals_to({0, 1, 2, 3}));
         assert(y.dim().equals_to({1, 2, 2}));
-        
+
         y_grad.reset({1, 2, 2}, TensorInit_Types::One);
         x.subset_grad(y, y_grad, x_grad, {1, 2, 2}, 0);
         assert(x_grad.vector().equals_to({1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}));
@@ -569,5 +577,161 @@ public:
         y_grad.reset({2, 2, 2}, TensorInit_Types::One);
         x.subset_grad(y, y_grad, x_grad, {2, 2, 2}, 4);
         assert(x_grad.vector().equals_to({1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
+    }
+
+    static void test_deep_copy()
+    {
+        TensorD<double> x2({2, 3}, TensorInit_Types::Ordinal), x;
+        x.deep_copy(x2, 1);
+        assert(x.vector().equals_to({0, 1, 2, 3, 4, 5}));
+
+        x.deep_copy(x2, 2);
+        assert(x.vector().equals_to({0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5}));
+        assert(x.dim().equals_to({2, 2, 3}));
+    }
+
+    static void test_equals_to()
+    {
+        TensorD<double> x({2, 3}, TensorInit_Types::Ordinal);
+        TensorD<double> x1({2, 3}, TensorInit_Types::Ordinal);
+        assert(x.equals_to(x1));
+        x1.vector()[1] = 100;
+        assert(!x.equals_to(x1));
+    }
+
+    // {batch_size, node_len}.encode{dict_size, input_dim} => {batch_size, node_len, input_dim} => input encoding
+    //    encode(x2, y, 0)
+
+    static void test_encode_by_dict()
+    {
+        TensorD<double> x({2, 3}), encoder_param({5, 2}), x_encoded;
+        x.vector().set(0, {0, 2, 1, 2, 3, 0});
+        encoder_param.vector().set(0, {0.1, 0.2, 0.9, 0.2, 0.1, 0.1, 0, 0, 1, 2});
+        x.encode_by_dict(encoder_param, x_encoded);
+        assert(x_encoded.vector().equals_to({0.1, 0.2, 0.1, 0.1, 0.9, 0.2, 0.1, 0.1, 0, 0, 0.1, 0.2}));
+
+        TensorD<double> x_encoded_grad;
+        x_encoded_grad.reset({2, 3, 2}, TensorInit_Types::One);
+        TensorD<double> encoder_param_grad;
+        x.encode_by_dict_grad(encoder_param, x_encoded, x_encoded_grad, encoder_param_grad);
+        assert(encoder_param_grad.dim().equals_to({5, 2}));
+        assert(encoder_param_grad.vector().equals_to({2, 2, 1, 1, 2, 2, 1, 1, 0, 0}));
+    }
+
+    // {batch_size, node_len}.encode{batch_size, node_len, dict_size} => {batch_size, node_len} => get target prob
+    //    encode(x2, y, 2)
+    static void test_search_by_dict()
+    {
+        TensorD<double> target({2, 3}), output({2, 3, 5}), output_decoded;
+        target.vector().set(0, {2, 1, 1, 0, 3, 1});
+        output.vector().set(0, {0, 0, 0, 1, 0, 0.9, 0.1, 0, 0, 0, 0.2, 0.5, 0.1, 0.0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0.5, 1, 0});
+        target.search_by_dict(output, output_decoded);
+        assert(output_decoded.vector().equals_to({0, 0.1, 0.5, 0, 0, 0}));
+        assert(output_decoded.dim().equals_to({2, 3}));
+
+        TensorD<double> output_decoded_grad;
+        output_decoded_grad.reset({2, 3}, TensorInit_Types::One);
+        TensorD<double> output_grad;
+        target.search_by_dict_grad(output, output_decoded, output_decoded_grad, output_grad);
+        assert(output_grad.dim().equals_to({2, 3, 5}));
+        assert(output_grad.vector().equals_to({0, 0, 1, 0, 0,
+                                               0, 1, 0, 0, 0,
+                                               0, 1, 0, 0, 0,
+                                               1, 0, 0, 0, 0,
+                                               0, 0, 0, 1, 0,
+                                               0, 1, 0, 0, 0}));
+    }
+
+    static void test_decode()
+    {
+        TensorD<double> x({2, 3, 5}), y;
+        x.vector().set(0, {0, 0, 0, 1, 0, 0.9, 0.1, 0, 0, 0, 0.2, 0.5, 0.1, 0.0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0.5, 1, 0});
+        x.decode__(y);
+        assert(y.vector().equals_to({3, 0, 1, 4, 0, 3}));
+        assert(y.dim().equals_to({2, 3}));
+    }
+
+    static void test_load()
+    {
+        TensorD<double> x, y{{2, 3}, TensorInit_Types::Ordinal};
+        std::stringstream i;
+        i << "start of tensor data\n";
+        i << "shape = 2\n";
+        i << "2 3\n";
+        i << "0 1 2 3 4 5\n";
+        i << "end of tensor data\n";
+        x.load(i);
+        assert(x.equals_to(y));
+    }
+
+    static void test_save()
+    {
+        TensorD<double> x{{2, 3}, TensorInit_Types::Ordinal};
+        std::stringstream o;
+        x.save(o);
+
+        assert(o.str() == "start of tensor data\nshape = 2\n2 3\n0 1 2 3 4 5\nend of tensor data\n");
+    }
+
+    static void test_append()
+    {
+        TensorD<double> x({2, 2, 2}, TensorInit_Types::Ordinal);
+        TensorD<double> x2({2, 2}, TensorInit_Types::Ordinal), y;
+        x.append(x2, y);
+        assert(y.dim().equals_to({3, 2, 2}));
+        assert(y.vector().equals_to({0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3}));
+
+        TensorD<double> x3({2}, TensorInit_Types::Ordinal), y1;
+        y.append(x3, y1, 1);
+        assert(y1.dim().equals_to({3, 3, 2}));
+        assert(y1.vector().equals_to({0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 0, 1}));
+
+        TensorD<double> y1_grad({3, 3, 2}, TensorInit_Types::One);
+        TensorD<double> y_grad, x3_grad;
+        y.append_grad(x3, y1, y1_grad, y_grad, x3_grad, true, 1);
+        assert(y_grad.equals_to({3, 2, 2}, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
+        assert(x3_grad.equals_to({2}, {1, 1}));
+    }
+
+    static void test_map()
+    {
+        TensorD<double> x({2, 3}, TensorInit_Types::Ordinal), y;
+        x.vector().set(0, {0, 1, 2, 3, 4, 5});
+        x.map(y, [](double v)
+              { return v >= 2 ? 1 : 0; });
+        assert(y.vector().equals_to({0, 0, 1, 1, 1, 1}));
+
+        TensorD<double> y_grad({2, 3}, TensorInit_Types::Ordinal);
+        TensorD<double> x_grad({2, 3}, TensorInit_Types::One);
+        x.map_grad(y, y_grad, x_grad, [](double v)
+                   { return v >= 2 ? 1 : 0; });
+        assert(x_grad.vector().equals_to({1, 1, 3, 4, 5, 6}));
+
+        TensorD<double> y1;
+        x.map(y1, [](const Vector<double> &x, uint start, uint len, Vector<double> &y)
+        {
+            if (len > 0) y[start] = 1; // <start> node;
+            for (uint i = 1; i < len; ++i)
+            {
+                y[start + i] = x[start + i - 1]; // note: <end> may be skipped
+            } 
+        }, 1);
+
+        assert(y1.vector().equals_to({1, 0, 1, 1, 3, 4}));
+
+
+        TensorD<double> y1_grad({2, 3}, TensorInit_Types::Ordinal);
+        TensorD<double> x1_grad({2, 3}, TensorInit_Types::One);
+        x.map_grad(y1, y1_grad, x1_grad, 
+        [](const Vector<double> &x, uint start, uint len, const Vector<double> &y_grad, Vector<double> &x_grad)
+        {
+            for (uint i = 0; i < len - 1; ++i)
+            {
+                x_grad[start + i] += y_grad[start + i+1];
+            }   
+        }, 
+        1);
+
+        assert(x1_grad.vector().equals_to({2, 3, 1, 5, 6, 1}));
     }
 };

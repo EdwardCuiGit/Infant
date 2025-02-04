@@ -38,7 +38,7 @@ private:
     FunctorNodePList _functors;
     TensorList _tensors;
     TensorList _params;
-    TensorList _input_tensors;
+    mutable TensorList _input_tensors;
     TensorList _output_tensors;
 
     FunctorGraph() : Functor("FunctorGraph"){}
@@ -55,7 +55,6 @@ private:
     void add(PFunctor func, const TensorList &inputs, const TensorList &outputs);
 
     NOTIMPLEMENTED void prune(const Tensor& start_tensor);
-
 
 public:
     // note: all the external inputs, needs to assign value by orders
@@ -113,14 +112,6 @@ public:
         for (Tensor t : _tensors)
         {
             t.grad().clear();
-        }
-    }
-
-    void set_train(bool yes = true)
-    {
-        for (auto f : _functors)
-        {
-            f->func->set_train(yes);
         }
     }
 

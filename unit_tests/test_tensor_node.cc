@@ -49,7 +49,8 @@ Squeeze: Tensor, Functor
 class TestTensorNode : public TestClass
 {
 public:
-    REGISTER_TEST_CASES(test_creates, test_upgrades, test_downgrades, test_gets, test_add, test_dot, test_linear, test_var, test_divide, test_combine)
+    REGISTER_TEST_CASES(test_creates, test_upgrades, test_downgrades, test_gets, test_add, test_dot, test_linear, test_var, test_divide, test_combine,
+    test_from_data, test_encode, test_decode, test_save, test_load, test_map)
 
     static void test_creates()
     {
@@ -67,20 +68,20 @@ public:
     static void test_upgrades()
     {
         TensorD<double> td({2, 3}, TensorInit_Types::Ordinal);
-        Tensor t = Tensor::deep_upgrade(td);
+        Tensor t = Tensor::Deep_Upgrade(td);
         assert(t.size() == 6);
         assert(t.data().vector()[1] = 1);
         t.data().vector()[1] = 2;
         assert(td[1] == 1);
 
-        Tensor t1 = Tensor::weak_upgrade(td);
+        Tensor t1 = Tensor::Weak_Upgrade(td);
         assert(t1.size() == 6);
         assert(t1.data().vector()[1] = 1);
         t1.data().vector()[2] = 3;
         assert(td[2] == 3);
 
         TensorDArray<double> x({td});
-        TensorList t2 = Tensor::weak_upgrade(x);
+        TensorList t2 = Tensor::Weak_Upgrade(x);
         assert(t2.size() == 1);
         assert(t2[0].data().vector()[1] = 1);
     }
@@ -90,7 +91,7 @@ public:
         Tensor t1({2, 3}, TensorInit_Types::Ordinal);
         Tensor t2({2, 2}, TensorInit_Types::Ordinal);
         TensorDArray<double> data, grad;
-        Tensor::weak_both_downgrade({t1, t2}, data, grad);
+        Tensor::Weak_Both_Downgrade({t1, t2}, data, grad);
         assert(data[0].size() == 6);
         assert(data[1].size() == 4);
         assert(grad[0].size() == 6);
@@ -99,7 +100,7 @@ public:
         assert(grad[0].vector()[1] == 0);
 
         TensorList x{t1, t2};
-        data = Tensor::weak_data_downgrade(x);
+        data = Tensor::Weak_Data_Downgrade(x);
         assert(data[0].size() == 6);
         assert(data[1].size() == 4);
         assert(data[0].vector()[1] == 1);
@@ -189,7 +190,7 @@ public:
         divide.backward(x.data(), y, x.grad());
 
         assert(x.grad().dim().equals_to({2, 3, 2}));
-        assert(x.grad().vector().equals_to(Vector<double>::one(12)));
+        assert(x.grad().vector().equals_to(Vector<double>::One(12)));
     }
 
     static void test_combine()
@@ -211,6 +212,67 @@ public:
 
         assert(x.size() == 2);
         assert(x[0].grad().dim().equals_to({3, 2}));
-        assert(x[1].grad().vector().equals_to(Vector<double>::one(6)));
+        assert(x[1].grad().vector().equals_to(Vector<double>::One(6)));
+    }
+
+    static void test_from_data(){
+        TensorD<double> xd({2, 2}, TensorInit_Types::Ordinal);
+        Tensor x = Tensor::From_Data(xd);
+        assert(x.dim().equals_to({2, 2}));
+        assert(x.data().vector().equals_to({0, 1, 2, 3}));
+    }
+
+    static void test_encode(){
+        Tensor x({2, 3}), encoder_param({5, 2}), x_encoded;
+        x.data().vector().set(0, {0, 2, 1, 2, 3, 0});
+        encoder_param.data().vector().set(0, {0.1, 0.2,  0.9, 0.2,  0.1, 0.1,  0,0,  1,2});
+        x_encoded = x.encode_by_dict(encoder_param);
+        assert(x_encoded.data().vector().equals_to({0.1, 0.2, 0.1, 0.1, 0.9, 0.2, 0.1, 0.1, 0,0, 0.1, 0.2}));
+
+        Tensor target({2, 3}), output({2, 3, 5}), output_decoded;
+        target.data().vector().set(0, {2, 1, 1, 0, 3, 1});
+        output.data().vector().set(0, {0,0,0,1,0,  0.9,0.1,0,0,0,  0.2, 0.5, 0.1,0.0,0,   0,0,0,0,1,  1,0,0,0,0,  0,0,0.5,1,0});
+        output_decoded = target.search_by_dict(output);
+        assert(output_decoded.data().vector().equals_to({0, 0.1, 0.5, 0, 0, 0}));
+    }
+
+    static void test_decode(){
+        Tensor x({2, 3, 5}), y;
+        x.data().vector().set(0, {0,0,0,1,0,  0.9,0.1,0,0,0,  0.2, 0.5, 0.1,0.0,0,   0,0,0,0,1,  1,0,0,0,0,  0,0,0.5,1,0});
+        y = x.decode__();
+        assert(y.data().vector().equals_to({3, 0, 1, 4, 0, 3}));
+        assert(y.dim().equals_to({2, 3}));
+    }
+
+    static void test_load(){
+        Tensor x, y({2, 3}, TensorInit_Types::Ordinal, "tensor1", true);
+
+        std::stringstream i;
+        i << "id = tensor1\n";
+        i << "is_auto_grad = 1\n";
+        i << "is_param = 1\n";
+        i << "is_print = 0\n";
+        i << "start of tensor data\n";
+        i << "shape = 2\n";
+        i << "2 3\n";
+        i << "0 1 2 3 4 5\n";
+        i << "end of tensor data\n";
+        x.load(i);
+        assert(x.equals_to(y));
+    }
+
+    static void test_save(){
+        Tensor x{{2, 3}, TensorInit_Types::Ordinal, "tensor1", true};
+        std::stringstream o;
+        x.save(o);
+
+        assert(o.str() == "id = tensor1\nis_auto_grad = 1\nis_param = 1\nis_print = 0\nstart of tensor data\nshape = 2\n2 3\n0 1 2 3 4 5\nend of tensor data\n");
+    }
+
+    static void test_map(){
+        Tensor x({2, 3}, TensorInit_Types::Ordinal);
+        x.data().vector().set(0, {0, 1, 2, 3, 4, 5});
+        auto y = x.map([](double v) { return v >= 2 ? 1 : 0; }, [](double v) { return v >= 2 ? 1 : 0; });
+        assert(y.data().vector().equals_to({0, 0, 1, 1, 1, 1}));
     }
 };

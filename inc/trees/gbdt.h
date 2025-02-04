@@ -5,6 +5,29 @@
 class Gbdt
 {
 public:
+    // TODO: pre-define each feature's type: Float, FiniteFloat, Integer, Enum
+    enum class FeatureTypes : uint
+    {
+        Float,
+        Integer,
+    };
+
+    struct FeatureType
+    {
+    public:
+        FeatureTypes _type;
+        union
+        {
+            double max_float;
+            int max_int;
+        } max_value;
+        union
+        {
+            double min_float;
+            int min_int;
+        } min_value;
+    };
+
     struct GbdtNode
     {
     public:
@@ -15,9 +38,9 @@ public:
         double _entropy = NAN;
         int _left_child = -1, _right_child = -1;
         uint _layer;
-        GbdtNode(uint layer) : _layer(layer){}
+        GbdtNode(uint layer) : _layer(layer) {}
 
-        //bool is_leaf() const { return _left_child == -1 && _right_child == -1; }
+        // bool is_leaf() const { return _left_child == -1 && _right_child == -1; }
     };
 
     struct GbdtTree
@@ -51,16 +74,17 @@ public:
         uint _max_bins = 10;
         double _min_bin_size = 0.00001;
         double _feature_fraction = 1; // not implemented
-        double _data_fraction = 1; // not implemented
+        double _data_fraction = 1;    // not implemented
         double _min_split_gain = 0.1;
         double _min_node_entropy = 0; // not used
         double _min_avg_residual = 0.1;
     };
 
 public:
-    bool train(const TensorDArray<double> training_data, const GbdtTrainingConfig &config, GbdtEnsemble &model)
+    bool train(const TensorDArray<double> training_data, const Array<FeatureType> &feature_types, const GbdtTrainingConfig &config, GbdtEnsemble &model)
     {
         // x is 2-dim feature array, z is 1-dim labels;
+        if (training_data.size() == 0) return false;
         assert(training_data.size() == 2);
         const TensorD<double> &x = training_data[0];
         const TensorD<double> &z = training_data[1];
@@ -69,15 +93,16 @@ public:
         assert(x.dim()[0] == z.dim()[0]);
         uint m = x.dim()[0]; // # of samples
         uint n = x.dim()[1]; // # of features
+        assert(feature_types.size() == n);
 
-        model._trees.clear();     // make the output model to be empty
+        model._trees.clear();                                              // make the output model to be empty
         TensorD<double> y({config._max_trees, m}, TensorInit_Types::Zero); // model outputs per tree, note: we may use 2-dim tensor
         TensorD<double> residual({config._max_trees, m});
 
         for (uint i = 0; i < config._max_trees; ++i)
-        {   
+        {
             GbdtTree tree;
-            bool success = build_tree(x, z, residual, config, tree, i);
+            bool success = build_tree(x, z, residual, feature_types, config, tree, i);
             model._trees.push_back(tree);
 
             // inference this tree, and store model outputs to y[i]
@@ -141,7 +166,7 @@ public:
             return tree._nodes[parent_node]._score;
     }
 
-    void calc_residual(const TensorD<double>& y, const TensorD<double> &z, TensorD<double> &residual, uint tree_id)
+    void calc_residual(const TensorD<double> &y, const TensorD<double> &z, TensorD<double> &residual, uint tree_id)
     {
         assert(y.shape() == 2 && y.dim().equals_to(residual.dim()));
         assert(z.shape() == 1 && z.dim()[0] == y.dim()[1]);
@@ -162,14 +187,15 @@ public:
         }
     }
 
-    bool build_tree(const TensorD<double>& x, const TensorD<double>& z, const TensorD<double>& residual, const GbdtTrainingConfig& config, GbdtTree& tree, uint tree_id)
+    bool build_tree(const TensorD<double> &x, const TensorD<double> &z, const TensorD<double> &residual,
+                    const Array<FeatureType> &feature_types, const GbdtTrainingConfig &config, GbdtTree &tree, uint tree_id)
     {
         uint m = x.dim()[0];
         uint n = x.dim()[1];
 
         TensorD<uint> sorts;
         // TODO: we can pre-sort all features across all samples first, so that no need to rerun sorts
-        //pre_sort(x, sorts);
+        // pre_sort(x, sorts);
 
         std::queue<std::pair<Vector<uint>, uint>> q;
         Vector<uint> samples(x.dim()[0], TensorInit_Types::Ordinal);
@@ -180,8 +206,8 @@ public:
         {
             auto pair = q.front();
             q.pop();
-            samples = pair.first; uint node_id = pair.second;
-
+            samples = pair.first;
+            uint node_id = pair.second;
 
             // prepare labels for selected samples
             Vector<double> curr_labels;
@@ -196,7 +222,7 @@ public:
             }
 
             Vector<uint> left_samples, right_samples;
-            bool success = split_node(samples, x, curr_labels, config, tree._nodes[node_id], left_samples, right_samples);
+            bool success = split_node(samples, x, curr_labels, feature_types, config, tree._nodes[node_id], left_samples, right_samples);
 
             if (success && tree._nodes[node_id]._layer < config._max_layers - 1) // this means node is not leaf node, below is to create 2 new child nodes
             {
@@ -213,13 +239,14 @@ public:
         return true;
     }
 
-    bool split_node(const Vector<uint>& samples, const TensorD<double>& x, const Vector<double>& curr_labels, 
-        const GbdtTrainingConfig& config, GbdtNode& node, Vector<uint>& left_samples, Vector<uint>& right_samples)
+    bool split_node(const Vector<uint> &samples, const TensorD<double> &x, const Vector<double> &curr_labels,
+                    const Array<FeatureType> &feature_types,
+                    const GbdtTrainingConfig &config, GbdtNode &node, Vector<uint> &left_samples, Vector<uint> &right_samples)
     {
         uint m = x.dim()[0];
         uint n = x.dim()[1];
 
-        node._entropy = curr_labels.var(); // this is for regression loss only
+        node._entropy = curr_labels.var();                  // this is for regression loss only
         if (samples.size() < config._min_samples_per_leave) // no need to split furthur
         {
             node._score = calc_node_score(curr_labels);
@@ -233,7 +260,7 @@ public:
         {
             // to speed up, cache features into one continous memory
             Vector<double> curr_features;
-            //Vector<uint> curr_sorts;
+            // Vector<uint> curr_sorts;
             double min_feature, max_feature;
             for (uint samples_id = 0; samples_id < samples.size(); ++samples_id)
             {
@@ -241,7 +268,7 @@ public:
                 assert(sample_id < m);
                 double feature_value = x.vector()[sample_id * n + feature_id];
                 curr_features.push_back(feature_value);
-                //curr_sorts.push_back(sorts.vector()[sample_id * n + feature_id]);
+                // curr_sorts.push_back(sorts.vector()[sample_id * n + feature_id]);
                 if (samples_id == 0)
                 {
                     max_feature = min_feature = feature_value;
@@ -260,8 +287,8 @@ public:
             }
 
             double best_feature_threshold, min_feature_entropy;
-            bool success = find_threshold(curr_features, curr_labels, config._max_bins, config._min_bin_size, min_feature, 
-                max_feature, best_feature_threshold, min_feature_entropy);
+            bool success = find_threshold(curr_features, curr_labels, feature_types[feature_id], config._max_bins, config._min_bin_size, min_feature,
+                                          max_feature, best_feature_threshold, min_feature_entropy);
             if (success && min_feature_entropy < min_entropy)
             {
                 min_entropy = min_feature_entropy;
@@ -303,7 +330,7 @@ public:
         }
     }
 
-    double calc_node_score(const Vector<double>& labels)
+    double calc_node_score(const Vector<double> &labels)
     {
         return labels.avg(); // note: this is for regression loss only
     }
@@ -311,20 +338,21 @@ public:
     // TODO: draw histogram/distribution of features, and don't make bins same size
     // TODO: left child histogram could build from parent histogram?
     // TODO: right child histogram could be parent histogram - left child histogram?
-    bool find_threshold(const Vector<double>& features, const Vector<double>& labels, uint max_bins, double min_bin_size,
-        double min_feature, double max_feature, double& best_threshold, double& min_feature_entropy)
+    bool find_threshold(const Vector<double> &features, const Vector<double> &labels,
+                        const FeatureType &feature_type, uint max_bins, double min_bin_size,
+                        double min_feature, double max_feature, double &best_threshold, double &min_feature_entropy)
     {
         // build histogram of this features vector, may fail if all features are the same
         Vector<Vector<double>> bins_vector; // each bin stores the vector of labels
-        build_histogram(features, labels, max_bins, min_bin_size, min_feature, max_feature, bins_vector);
+        build_histogram(features, labels, feature_type, max_bins, min_bin_size, min_feature, max_feature, bins_vector);
         if (bins_vector.size() <= 1) // no need to split
         {
             return false;
         }
-        
+
         // flatten this bins_vector and stores the size of each so that we can use one continuous vector to calculate variance
-        Vector<double> flatten_vector; 
-        Vector<double>::flatten(bins_vector, flatten_vector);
+        Vector<double> flatten_vector;
+        Vector<double>::Flatten(bins_vector, flatten_vector);
 
         // loop histogram to calculate feature gains per each bin
         double bin_size = (max_feature - min_feature) / bins_vector.size();
@@ -333,7 +361,7 @@ public:
         {
             if (bins_vector[i - 1].size() == 0) // no need to process empty bin
                 continue;
-            
+
             left_size += bins_vector[i - 1].size();
             right_size -= bins_vector[i - 1].size();
             assert(left_size > 0 && right_size > 0);
@@ -357,7 +385,7 @@ public:
 
     // can we pre-calculate each bin's variance and then do speed up? => seems not
     // TODO: for binary classification or ranking loss, we may need different feature gain function, so far only use variance
-    double calc_entropy(const Vector<double>& flatten_vector, uint left_size)
+    double calc_entropy(const Vector<double> &flatten_vector, uint left_size)
     {
         double left_variance = flatten_vector.var(0, left_size);
         double right_variance = flatten_vector.var(left_size, flatten_vector.size() - left_size);
@@ -365,8 +393,11 @@ public:
     }
 
     // TODO: we shall use global data to do histogram, instead of each selected subsets of samples
-    void build_histogram(const Vector<double>& features, const Vector<double>& labels, uint max_bins, double min_bin_size, double min_feature, double max_feature, Vector<Vector<double>>& bins_vector)
+    void build_histogram(const Vector<double> &features, const Vector<double> &labels,
+                         const FeatureType &feature_type, uint max_bins, double min_bin_size, 
+                         double min_feature, double max_feature, Vector<Vector<double>> &bins_vector)
     {
+        // TODO: use feature_type here
         assert(max_bins >= 1);
         uint bins = max_bins;
         // this means we can't create max_bins as too many features are very similar
@@ -395,8 +426,9 @@ public:
         }
     }
 
-    TensorD<double>& inference(const TensorD<double> &x, TensorD<double>& y, const GbdtEnsemble& model)
+    TensorD<double> &inference(const TensorD<double> &x, TensorD<double> &y, const GbdtEnsemble &model)
     {
+        if (x.size() == 0) return y;
         assert(x.shape() == 2);
         uint m = x.dim()[0];
         uint n = x.dim()[1];

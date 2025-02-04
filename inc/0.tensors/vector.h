@@ -2,7 +2,6 @@
 
 #include <random>
 #include "array.h"
-#include "scalar.h"
 
 // Vector is basic class for numeric array, support major binary & unary map/reduce ops
 // alowed T: int, float, short, byte
@@ -40,32 +39,6 @@
             bool: all_pos, all_in01
             double &sum(uint v1_start = 0, int len = -1) const;
     */
-
-enum class TensorInit_Types : uint
-{
-    None,
-    Zero,
-    One,
-    Ordinal,
-    Rand,
-    Gaussian,
-};
-
-enum class Activation_Types : uint
-{
-    None,
-    Linear,
-    Relu,
-    Tanh,
-    Sigmoid
-};
-
-enum class Pooling_Types: uint
-{
-    Avg,
-    Max,
-    Min
-};
 
 /*// random init, called in main function's starting
 // TODO: ensure it thread safe
@@ -109,27 +82,27 @@ public:
         this->copy(v2);
     }
 
-    inline static Vector<T> zero(uint size)
+    inline static Vector<T> Zero(uint size)
     {
         return Vector<T>(size, TensorInit_Types::Zero);
     }
 
-    inline static Vector<T> one(uint size)
+    inline static Vector<T> One(uint size)
     {
         return Vector<T>(size, TensorInit_Types::One);
     }
 
-    inline static Vector<T> ordinal(uint size)
+    inline static Vector<T> Ordinal(uint size)
     {
         return Vector<T>(size, TensorInit_Types::Ordinal);
     }
 
-    inline static Vector<T> gaussian(uint size)
+    inline static Vector<T> Gaussian(uint size)
     {
         return Vector<T>(size, TensorInit_Types::Gaussian);
     }
 
-    inline static Vector<T> rand(uint size)
+    inline static Vector<T> Rand(uint size)
     {
         return Vector<T>(size, TensorInit_Types::Rand);
     }
@@ -145,6 +118,9 @@ public:
             break;
         case TensorInit_Types::One:
             this->set_each(1.0);
+            break;
+        case TensorInit_Types::Half:
+            this->set_each(0.5);
             break;
         case TensorInit_Types::Ordinal:
             this->set_ordinal();
@@ -270,6 +246,10 @@ public:
         for (uint j = 0; j < len; ++j)
         {
             T res = map_func(this->get(v1_start + j), v2[v2_start + j]);
+            if (std::isnan(res))
+            {
+                assert(false);
+            }
             if (add_to)
                 out[out_start] += res;
             else
@@ -369,6 +349,11 @@ public:
         for (uint i = 1; i < len; ++i)
         {
             T map_res = map_func(this->get(v1_start + i), v2[v2_start + i], i);
+            if (std::isnan(map_res))
+            {
+                assert(false);
+            }
+            
             res = reduce_func(res, map_res, i);
         }
 
@@ -447,7 +432,7 @@ public:
     double cosine_distance(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         auto norm_v1 = norm_ln(2.0, v1_start, len);
-        auto norm_v2 = norm_ln(2.0, v2_start, len);
+        auto norm_v2 = v2.norm_ln(2.0, v2_start, len);
         norm_v1 = std::max(EPSILON, norm_v1);
         norm_v2 = std::max(EPSILON, norm_v2);
         return dot(v2, v1_start, v2_start, len) / (norm_v1 * norm_v2);
@@ -483,11 +468,21 @@ public:
     // last n elems are the same
     bool match_bottom(const Vector<T> &v2, int last_n = -1, bool bottom = true) const
     {
-        assert(this->size() >= v2.size()); // TODO: we need to consider last_n
-        last_n = (last_n == -1 || last_n > v2.size()) ? v2.size() : last_n;
-        return bool_func([](T e1, T e2, uint) -> bool
-                         { return e1 == e2; },
-                         v2, bottom ? this->size() - last_n : 0, bottom ? v2.size() - last_n : 0, last_n);
+        // assert(this->size() >= v2.size()); // TODO: we need to consider last_n
+        if (this->size() >= v2.size())
+        {
+            last_n = (last_n == -1 || last_n > v2.size()) ? v2.size() : last_n;
+            return bool_func([](T e1, T e2, uint) -> bool
+                            { return e1 == e2; },
+                            v2, bottom ? this->size() - last_n : 0, bottom ? v2.size() - last_n : 0, last_n);
+        }
+        else
+        {
+            last_n = (last_n == -1 || last_n > this->size()) ? this->size() : last_n;
+            return bool_func([](T e1, T e2, uint) -> bool
+                            { return e1 == e2; },
+                            v2, bottom ? this->size() - last_n : 0, bottom ? v2.size() - last_n : 0, last_n);
+        }
     }
 
     // 4. unary map ops: (vector) -> vector
@@ -502,6 +497,10 @@ public:
         for (uint j = 0; j < len; ++j)
         {
             T res = func(this->get(v1_start + j));
+            if (std::isnan(res))
+            {
+                assert(false);
+            }
             if (add_to)
                 out[out_start] += res;
             else
@@ -528,15 +527,30 @@ public:
 
     Vector<T> &softmax(Vector<T> &out, uint v1_start = 0, uint out_start = 0, int len = -1) const
     {
-        double denominator = 0;
-        map([&denominator](T e) -> T
+        if (len < 0)
+            len = this->size() - v1_start;
+        
+        // Find max value first to prevent overflow
+        T max_val = this->max(v1_start, len);
+        if (max_val == INF_NEG)
+        {
+            for (uint i = 0; i < len; ++i)            
             {
-            auto exp_e = std::exp(e);
-            denominator += exp_e;
-            return exp_e; },
+                out[out_start + i] = 0;
+            }
+
+            return out;
+        }
+        
+        double denominator = 0;
+        map([max_val, &denominator](T e) -> T
+            {
+                auto exp_e = std::exp(e - max_val); // Subtract max_val before exp
+                denominator += exp_e;
+                return exp_e;
+            },
             out, v1_start, out_start, len, false);
 
-        // note: handle denominator == 0 case => no need, since the lambda will not be executed due to len == 0
         return out.map([denominator](T e) -> T
                        { return e / denominator; },
                        out, out_start, out_start, len, false);
@@ -560,6 +574,10 @@ public:
         for (uint i = 1; i < len; ++i)
         {
             T map_res = map_func(this->get(v1_start + i));
+            if (std::isnan(map_res))
+            {
+                assert(false);
+            }
             res = reduce_func(res, map_res, i);
         }
 
@@ -655,7 +673,7 @@ public:
     }
 
     // binary distribution
-    static double binary_entropy(double p)
+    static double Binary_Entropy(double p)
     {
         assert(p > 0 && p < 1);
         return -1.0 * (p * std::log2(p) + (1 - p) * std::log2(1 - p));
@@ -694,7 +712,7 @@ public:
     }
 
     // manipulation funcs
-    static void flatten(const Vector<Vector<T>>& bins_vector, Vector<T>& flatten_vector)
+    static void Flatten(const Vector<Vector<T>>& bins_vector, Vector<T>& flatten_vector)
     {
         for (uint i = 0; i < bins_vector.size(); ++i)
         {

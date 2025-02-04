@@ -73,6 +73,28 @@ public:
     }
 };
 
+class Ln : public UnFunctor
+{
+private:
+    double _bias;
+
+public:
+    Ln(double bias = 0, int last_work_dims = -1)
+        : UnFunctor("Ln", last_work_dims), _bias(bias)
+    {
+    }
+
+    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    {
+        x.ln(y, _bias, _last_work_dims);
+    }
+
+    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    {
+        x.ln_grad(y, y_grad, x_grad, _bias, _last_work_dims);
+    }
+};
+
 class Softmax : public UnFunctor
 {
 private:
@@ -355,6 +377,48 @@ public:
     virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
     {
         x.subset_grad(y, y_grad, x_grad, _dim, _offset);
+    }
+};
+
+// this named Convert to dedup with std::map
+class MapFunctor: public UnFunctor
+{
+private:
+    uint _first_match_dims;
+    bool _vector_mode = false;
+    std::function<double(double)> _func;
+    std::function<double(double)> _func_grad;
+    std::function<void(const Vector<double>&, uint, uint, Vector<double>&)> _vector_func;
+    std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)> _vector_func_grad;
+    // const std::function<double(double)>& _func; => note: this leads to this variable value not assigned
+public:
+    MapFunctor(std::function<double(double)> func, 
+            std::function<double(double)> func_grad) : UnFunctor("Map"), 
+    _func(func), _func_grad(func_grad), _first_match_dims(0)
+    {
+    }
+
+    MapFunctor(std::function<void(const Vector<double>&, uint, uint, Vector<double>&)> func,
+            std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)> func_grad,
+            uint first_match_dims = 0) : UnFunctor("Map"),
+    _vector_func(func), _vector_func_grad(func_grad), _vector_mode(true), _first_match_dims(first_match_dims)
+    {
+    } 
+
+    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    {
+        if (!_vector_mode)
+            x.map(y, _func);
+        else
+            x.map(y, _vector_func, _first_match_dims);
+    }
+
+    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    {
+        if (!_vector_mode)
+            x.map_grad(y, y_grad, x_grad, _func_grad);
+        else
+            x.map_grad(y, y_grad, x_grad, _vector_func_grad, _first_match_dims);
     }
 };
 

@@ -18,8 +18,16 @@ TODO: InstanceNorm;
 
 class NormBase : public UnOp
 {
+public:
+    NormBase(ConfigBase* ptr, const std::string& type) : UnOp(ptr, type){}
+    // as there are mutable variables
+    virtual bool is_const() const override
+    {
+        return false;
+    }
 };
 
+// not saving save/load
 class BatchNorm2d : public NormBase
 {
 private:
@@ -33,13 +41,13 @@ private:
 
 public:
     BatchNorm2d(uint channels, double momentum = 0.1, bool affine = true, bool track_running_stats = true)
-        : _channels(channels), _momentum(momentum), _affine(affine), _track_running_stats(track_running_stats)
+        : NormBase(nullptr, "BatchNorm2d"), _channels(channels), _momentum(momentum), _affine(affine), _track_running_stats(track_running_stats)
     {
         assert(channels > 0);
         if (affine)
         {
-            _alpha = create_param("alpha", {_channels}, TensorInit_Types::One);
-            _beta = create_param("beta", {_channels}, TensorInit_Types::Zero);
+            _alpha = add_param("alpha", {_channels}, TensorInit_Types::One);
+            _beta = add_param("beta", {_channels}, TensorInit_Types::Zero);
         }
 
         if (track_running_stats)
@@ -52,9 +60,9 @@ public:
 
     // input: x[N, C, H, W], output: y[N, C, H, W], each channel has one mean/variance value
     // x[i] = (x[i] - mean) / sqrt(variance + e) * alpha + beta;
-    virtual void forward(const Tensor &x, Tensor &y) const override
+    virtual Tensor forward(const Tensor &x) const override
     {
-        assert(x.shape() == 4);
+        assert(x.shape() >= 4);
         assert(x.dim()[1] == _channels);
         auto x_c = x.swap(0, 1);                // [C, N, H, W]
         auto mean = x_c.avg(3), var = x_c.var(false, 3); // mean/var: [C]
@@ -66,10 +74,10 @@ public:
             x_c.mul_(_alpha, 1, 0, 1, 0).add_(_beta, 1, 1, 0, 1, 0);
         }
 
-        y = x_c.swap(0, 1);
+        Tensor y = x_c.swap(0, 1);
 
         double exp_avg_factor = _momentum;
-        if (_is_train && _track_running_stats)
+        if (Environment::Is_Train() && _track_running_stats)
         {
             _num_batches_tracked++;
             if (_momentum == 0)
@@ -80,62 +88,93 @@ public:
             _running_mean.add(mean.data(), _running_mean, exp_avg_factor, 1 - exp_avg_factor);
             _running_var.add(var.data(), _running_var, exp_avg_factor, 1 - exp_avg_factor);
         }
+
+        return y;
     }
 };
 
 class LayerNorm : public NormBase
 {
+public:
+    // this is to support auto save/load
+    struct Config : ConfigBase
+    {
+        DEFINE_FIELD(bool, has_lm, false);
+
+        Vector<uint> &last_dims() { return access_uint_vector("last_dims"); } 
+        const Vector<uint> last_dims() const { return access_uint_vector("last_dims"); } 
+        // const Vector<uint> last_dims; // note: we can't use T& as class members
+
+        DEFINE_FIELD(double, momentum, 0.1);
+        DEFINE_FIELD(bool, affine, true);
+        DEFINE_FIELD(bool, track_running_stats, false);
+
+        Config(const Vector<uint>& last_dims = {}, bool has_lm = false, double momentum = 0.1, bool affine = true, bool track_running_stats = false)
+        : ConfigBase("LayerNorm")
+        {
+            this->has_lm() = has_lm;
+            this->last_dims() = last_dims;
+            this->momentum() = momentum;
+            this->affine() = affine;
+            this->track_running_stats() = track_running_stats;
+        }
+    };
+
 private:
+    Config _c;
     Tensor _alpha, _beta;
+    // TODO: _running_mean & _running_var & _num_batches_tracked only used in first_forward, and we need to keep this LayerNorm in the graph
     mutable TensorD<double> _running_mean, _running_var; // assigned but not used
     mutable uint _num_batches_tracked;
-    Vector<uint> _last_dims;
-    double _momentum;
-    bool _affine;
-    bool _track_running_stats;
-
 public:
-    LayerNorm(const Vector<uint>& last_dims, double momentum = 0.1, bool affine = true, bool track_running_stats = true)
-        : _last_dims(last_dims), _momentum(momentum), _affine(affine), _track_running_stats(track_running_stats)
+    // LayerNorm() : NormBase(&_c, "LayerNorm"){}
+    LayerNorm(const Config& c) : NormBase(&_c, "LayerNorm"), _c(c)
     {
-        if (affine)
+        if (!c.has_lm())
+            return;
+        if (c.affine())
         {
-            _alpha = create_param("alpha", last_dims, TensorInit_Types::One);
-            _beta = create_param("beta", last_dims, TensorInit_Types::Zero);
+            _alpha = add_param("alpha", c.last_dims(), TensorInit_Types::One);
+            _beta = add_param("beta", c.last_dims(), TensorInit_Types::Zero);
         }
 
-        if (track_running_stats)
+        if (c.track_running_stats())
         {
             _num_batches_tracked = 0;
-            _running_mean.reset(last_dims, TensorInit_Types::Zero);
-            _running_var.reset(last_dims, TensorInit_Types::One);
+            _running_mean.reset(c.last_dims(), TensorInit_Types::Zero);
+            _running_var.reset(c.last_dims(), TensorInit_Types::One);
         }
     }
 
     // input: x[], each last_size calc one mean/var
     // x[i] = (x[i] - mean) / sqrt(variance + e) * alpha + beta;
     // Note: elems in one last_size don't share alpha/beta, the same elem across different groups share same alpha/beta
-    OVERRIDE void forward(const Tensor &x, Tensor &y) const
+    virtual Tensor forward(const Tensor &x) const override
     {
+        if (!_c.has_lm())
+        {
+            return x;
+        }
+
         assert(x.shape() > 0);
-        assert(x.dim().match_bottom(_last_dims));
-        uint last_dims = _last_dims.size();
+        assert(x.dim().match_bottom(_c.last_dims()));
+        uint last_dims = _c.last_dims().size();
         uint first_match_dims = x.shape() - last_dims;
 
         // Note: mean/var will affect x's grad
         auto mean = x.avg(last_dims), var = x.var(false, last_dims);
 
-        y = x.add(mean, 1.0, -1.0, 0, first_match_dims, 0).mul_(var.pow(-0.5, EPSILON), 1, 0, first_match_dims, 0);
-        if (_affine)
+        Tensor y = x.add(mean, 1.0, -1.0, 0, first_match_dims, 0).mul_(var.pow(-0.5, EPSILON), 1, 0, first_match_dims, 0);
+        if (_c.affine())
         {
             y.mul_(_alpha, 1, 0, 0, last_dims).add_(_beta, 1, 1, 0, 0, last_dims);
         }
 
-        double exp_avg_factor = _momentum;
-        if (_is_train && _track_running_stats)
+        double exp_avg_factor = _c.momentum();
+        if (Environment::Is_Train() && _c.track_running_stats())
         {
             _num_batches_tracked++;
-            if (_momentum == 0)
+            if (_c.momentum() == 0)
             {
                 exp_avg_factor = 1.0 / _num_batches_tracked;
             }
@@ -143,5 +182,12 @@ public:
             _running_mean.add(mean.data(), _running_mean, exp_avg_factor, 1 - exp_avg_factor);
             _running_var.add(var.data(), _running_var, exp_avg_factor, 1 - exp_avg_factor);
         }
+
+        return y;
+    }
+
+    virtual bool is_const() const
+    {
+        return !(_c.has_lm() && Environment::Is_Train() && _c.track_running_stats());
     }
 };

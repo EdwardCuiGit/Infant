@@ -11,10 +11,10 @@ enum class Optimizer_Types : uint
 struct OptimizerConfig
 {
 public:
-    Optimizer_Types optim_type;
-    double learning_rate;
-    double weight_decay;
-    double momentum;
+    Optimizer_Types optim_type = Optimizer_Types::Sgd;
+    double learning_rate = 0.000001;
+    double weight_decay = 0;
+    double momentum = 0.2;
 };
 
 // How to add new operator: inherit Optimizer, add type to Optimizer_Types, add one row in create(), all in this file
@@ -29,9 +29,9 @@ protected:
     OptimizerConfig _config;
 
 public:
-    static bool parse_config(const std::string &config_file, OptimizerConfig &config);
-    static Ptr<Optimizer> create(const std::string &config_file);
-    static Ptr<Optimizer> create(const OptimizerConfig &config);
+    static bool Parse_config(const std::string &config_file, OptimizerConfig &config);
+    static Ptr<Optimizer> Create(const std::string &config_file);
+    static Ptr<Optimizer> Create(const OptimizerConfig &config);
 
     Optimizer()
     {
@@ -97,6 +97,13 @@ public:
                     param.momentum().reset(param.dim(), TensorInit_Types::Zero);
                 }
 
+                TensorD<double> grad_sum;
+                param.grad().sum(grad_sum);
+                if (grad_sum.first_item() == 0) // address gradient vanishing problem
+                {
+                    param.grad().reset(param.dim(),  TensorInit_Types::Gaussian);
+                }
+
                 // NG's formula:
                 //  grad = param->momentum->add_(param->grad(), 0, -1, _config.momentum, 1 - _config.momentum);
                 //  param->add_(grad, 1.0, -1.0 * _config.learning_rate);
@@ -112,17 +119,17 @@ public:
     }
 };
 
-bool Optimizer::parse_config(const std::string &config_file, OptimizerConfig &config)
+bool Optimizer::Parse_config(const std::string &config_file, OptimizerConfig &config)
 {
     // TODO
     assert(false);
     return false;
 }
 
-Ptr<Optimizer> Optimizer::create(const std::string &config_file)
+Ptr<Optimizer> Optimizer::Create(const std::string &config_file)
 {
     OptimizerConfig config;
-    bool ok = parse_config(config_file, config);
+    bool ok = Parse_config(config_file, config);
     if (!ok)
     {
         LOG_ERROR("parse optimizer config failed\n"
@@ -130,10 +137,10 @@ Ptr<Optimizer> Optimizer::create(const std::string &config_file)
         return nullptr;
     }
 
-    return create(config);
+    return Create(config);
 }
 
-Ptr<Optimizer> Optimizer::create(const OptimizerConfig &config)
+Ptr<Optimizer> Optimizer::Create(const OptimizerConfig &config)
 {
     /*std::map<Optimizer_Types, Ptr<Optimizer>> instances = {
         {Optimizer_Types::SGD, std::make_shared<Sgd>()},
