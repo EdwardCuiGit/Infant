@@ -1,6 +1,6 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/2.operators/conv.h"
+#include "inc/2.operators/conv.h"
 
 class TestConv: public TestClass
 {

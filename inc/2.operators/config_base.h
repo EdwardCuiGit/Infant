@@ -28,7 +28,7 @@ private:
     Map<const std::string, uint> _m_uint;
     Map<const std::string, int> _m_int;
     Map<const std::string, bool> _m_bool;
-    Map<const std::string, double> _m_double;
+    Map<const std::string, float> _m_float;
     Map<const std::string, Vector<uint>> _m_uint_vector;
     // name, => {type, ConfigBase*}
     Map<const std::string, Ptr<ConfigBase>> _m_config;
@@ -88,15 +88,15 @@ public:
         return this->_m_bool[name];
     }
 
-    inline double &access_double(const std::string &name, double default_value = 0)
+    inline float &access_float(const std::string &name, float default_value = 0)
     {
-        auto res = this->_m_double.find(name);
-        if (res == this->_m_double.end())
+        auto res = this->_m_float.find(name);
+        if (res == this->_m_float.end())
         {
-            this->_m_double[name] = default_value;
+            this->_m_float[name] = default_value;
         }
 
-        return this->_m_double[name];
+        return this->_m_float[name];
     }
 
     inline Vector<uint> &access_uint_vector(const std::string &name)
@@ -154,10 +154,10 @@ public:
         return res->second;
     }
 
-    inline double access_double(const std::string &name) const
+    inline float access_float(const std::string &name) const
     {
-        auto res = this->_m_double.find(name);
-        if (res == this->_m_double.end())
+        auto res = this->_m_float.find(name);
+        if (res == this->_m_float.end())
         {
             assert(false);
         }
@@ -204,7 +204,7 @@ public:
             o << pair.first << " " << (uint)NumTypes::Bool << " " << pair.second << "\n";
         }
 
-        for (auto pair : _m_double)
+        for (auto pair : _m_float)
         {
             o << pair.first << " " << (uint)NumTypes::Double << " " << pair.second << "\n";
         }
@@ -257,7 +257,7 @@ public:
                 break;
             case (int)NumTypes::Double:
                 assert(fields.size() == 3);
-                access_double(name) = std::stod(fields[2]);
+                access_float(name) = std::stod(fields[2]);
                 break;
             case (int)NumTypes::UintVector:
                 for (uint j = 2; j < fields.size(); ++j)
@@ -301,9 +301,9 @@ public:
         access_uint(name) = value;
     }
 
-    RTConfig(const Str& name, double value = 0.0) : RTConfig()
+    RTConfig(const Str& name, float value = 0.0) : RTConfig()
     {
-        access_double(name) = value;
+        access_float(name) = value;
     }
 
     RTConfig(const Str& name, int value = 0) : RTConfig()
@@ -311,5 +311,3 @@ public:
         access_int(name) = value;
     }
 };
-
-Map<std::string, ConfigBase::Operator_Config_Func> ConfigBase::_Op_Config_Factory;

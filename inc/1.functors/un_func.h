@@ -13,13 +13,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const = 0;
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const = 0;
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const = 0;
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const = 0;
 
-    virtual void forward(const TensorD<double> &x, TensorList &y) const override;
+    virtual void forward(const TensorD<float> &x, TensorList &y) const override;
 
-    virtual void backward(const TensorD<double> &x, const TensorList &y, TensorD<double> &x_grad) const override;
+    virtual void backward(const TensorD<float> &x, const TensorList &y, TensorD<float> &x_grad) const override;
 
     virtual uint output_tensor_count() const override
     {
@@ -31,21 +31,21 @@ public:
 class Linear : public UnFunctor
 {
 private:
-    double _alpha;
-    double _beta;
+    float _alpha;
+    float _beta;
 
 public:
-    Linear(double alpha = 1.0, double beta = 0.0, int last_work_dims = -1)
+    Linear(float alpha = 1.0, float beta = 0.0, int last_work_dims = -1)
         : UnFunctor("Linear", last_work_dims), _alpha(alpha), _beta(beta)
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.linear(y, _alpha, _beta, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override 
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override 
     {
         x.linear_grad(y, y_grad, x_grad, _alpha, _beta, _last_work_dims);
     }
@@ -54,20 +54,20 @@ public:
 class Pow : public UnFunctor
 {
 private:
-    double _n, _bias;
+    float _n, _bias;
 
 public:
-    Pow(double n = 1.0, double bias = 0, int last_work_dims = -1)
+    Pow(float n = 1.0, float bias = 0, int last_work_dims = -1)
         : UnFunctor("Pow", last_work_dims), _n(n), _bias(bias)
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.pow(y, _n, _bias, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.pow_grad(y, y_grad, x_grad, _n, _bias, _last_work_dims);
     }
@@ -76,20 +76,20 @@ public:
 class Ln : public UnFunctor
 {
 private:
-    double _bias;
+    float _bias;
 
 public:
-    Ln(double bias = 0, int last_work_dims = -1)
+    Ln(float bias = 0, int last_work_dims = -1)
         : UnFunctor("Ln", last_work_dims), _bias(bias)
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.ln(y, _bias, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.ln_grad(y, y_grad, x_grad, _bias, _last_work_dims);
     }
@@ -104,13 +104,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.softmax(y, _last_work_dims);
     }
 
     // note: x, y may not be used: we could collect them and free them in advance
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.softmax_grad(y, y_grad, x_grad, _last_work_dims);
     }
@@ -127,18 +127,76 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.activation(_act_type, y, _last_work_dims);
     }
 
     // TODO: not used: x, y: we could collect them and free them in advance
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.activation_grad(_act_type, y, y_grad, x_grad, _last_work_dims);
     }
 };
 
+class RmsNorm : public UnFunctor
+{
+private:
+    float _gamma;
+public:
+    RmsNorm(float gamma = 1.0f, int last_work_dims = -1) : UnFunctor("RmsNorm", last_work_dims), _gamma(gamma) {}
+
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
+    {
+        x.rms_norm(y, _gamma, _last_work_dims);
+    }
+
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
+    {
+        x.rms_norm_grad(y, y_grad, x_grad, _gamma);
+    }
+};
+
+class Replace : public UnFunctor
+{
+private:
+    float _cond_value, _if_value, _else_value;
+public:
+    Replace(float cond_value, float if_value, float else_value) : UnFunctor("Replace"), _cond_value(cond_value), _if_value(if_value), _else_value(else_value)
+    {
+    }
+
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
+    {
+        y = x.replace(_cond_value, _if_value, _else_value);
+    }
+
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
+    {
+        x.replace_grad(y, y_grad, x_grad, _cond_value, _if_value, _else_value);
+    }
+};
+
+class Insert : public UnFunctor
+{
+private:
+    uint _pos;
+    float _value;
+public:
+    Insert(uint pos, float value, int last_work_dims) : UnFunctor("Insert", last_work_dims), _pos(pos), _value(value)
+    {
+    }
+
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override 
+    {
+        y = x.insert(_pos, _value, _last_work_dims);
+    }
+
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
+    {
+        y.insert_grad(y, y_grad, x_grad, _pos, _value, _last_work_dims);
+    }
+};
 
 class Sum : public UnFunctor
 {
@@ -148,12 +206,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.sum(y, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.sum_grad(y, y_grad, x_grad, _last_work_dims);
     }
@@ -167,12 +225,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.avg(y, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.avg_grad(y, y_grad, x_grad, _last_work_dims);
     }
@@ -189,12 +247,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.var(y, _biased, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.var_grad(y, y_grad, x_grad, _biased, _last_work_dims);
     }
@@ -209,12 +267,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.max(y, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.max_grad(y, y_grad, x_grad, _last_work_dims);
     }
@@ -228,12 +286,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.min(y, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.min_grad(y, y_grad, x_grad, _last_work_dims);
     }
@@ -251,12 +309,12 @@ public:
     }
 
     // Note: not support common Un parameters: _last_work_dims
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.swap(y, _first_dim, _second_dim);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         y_grad.swap(x_grad, _first_dim, _second_dim);
     }
@@ -273,12 +331,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.move_forward(y, _move_from, _move_len, _move_to);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         y_grad.move_forward(x_grad, _move_to + _move_len, _move_from - _move_to, _move_to);
     }
@@ -295,12 +353,12 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.im2col(y, _groups, _kernel_x, _kernel_y, _stride_x, _stride_y, _padding_x, _padding_y);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.im2col_grad(y, y_grad, x_grad, _groups, _kernel_x, _kernel_y, _stride_x, _stride_y, _padding_x, _padding_y);
     }
@@ -313,12 +371,12 @@ private:
 public:
     MergeDim(uint from, uint len) : UnFunctor("MergeDim"), _from(from), _len(len){}
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.merge_dim(y, _from, _len);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.merge_dim_grad(y, y_grad, x_grad, _from, _len);
     }
@@ -332,12 +390,12 @@ public:
     Inflate(const Vector<uint>& dims) : UnFunctor("Inflate"), _dims(dims)
     {}
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.inflate(y, _dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.inflate_grad(y, y_grad, x_grad, _dims);
     }
@@ -345,18 +403,58 @@ public:
 
 class Squeeze : public UnFunctor
 {
+private:
+    int _dim;
 public:
-    Squeeze() : UnFunctor("Squeeze")
+    Squeeze(int dim) : UnFunctor("Squeeze"), _dim(dim)
     {}
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
-        x.squeeze(y);
+        x.squeeze(y, _dim);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
-        x.squeeze_grad(y, y_grad, x_grad);
+        x.squeeze_grad(y, y_grad, x_grad, _dim);
+    }
+};
+
+class Unsqueeze : public UnFunctor
+{
+private:
+    uint _dim;
+public:
+    Unsqueeze(uint dim) : UnFunctor("Unsqueeze"), _dim(dim)
+    {}
+
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
+    {
+        y = x.unsqueeze(_dim);
+    }
+
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
+    {
+        x.unsqueeze_grad(y, y_grad, x_grad, _dim);
+    }
+};
+
+class Reshape : public UnFunctor
+{
+private:
+    Vector<uint> _dim;
+public:
+    Reshape(const Vector<uint>& dim) : UnFunctor("Reshape"), _dim(dim)
+    {}
+
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
+    {
+        y = x.reshape(_dim);
+    }
+
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
+    {
+        x.reshape_grad(y, y_grad, x_grad, _dim);
     }
 };
 
@@ -369,14 +467,33 @@ public:
     Subset(const Vector<uint>& dim, uint offset) : UnFunctor("Subset"), _dim(dim), _offset(offset)
     {}
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.subset(y, _dim, _offset);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         x.subset_grad(y, y_grad, x_grad, _dim, _offset);
+    }
+};
+
+class Dropout : public UnFunctor
+{
+private:
+    float _p;
+public:
+    Dropout(float p) : UnFunctor("Dropout"), _p(p)
+    {} 
+
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
+    {
+        x.dropout(y, _p);
+    }
+
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
+    {
+        x.dropout_grad(y, y_grad, x_grad, _p);
     }
 };
 
@@ -386,26 +503,26 @@ class MapFunctor: public UnFunctor
 private:
     uint _first_match_dims;
     bool _vector_mode = false;
-    std::function<double(double)> _func;
-    std::function<double(double)> _func_grad;
-    std::function<void(const Vector<double>&, uint, uint, Vector<double>&)> _vector_func;
-    std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)> _vector_func_grad;
-    // const std::function<double(double)>& _func; => note: this leads to this variable value not assigned
+    std::function<float(float)> _func;
+    std::function<float(float)> _func_grad;
+    std::function<void(const Vector<float>&, uint, uint, Vector<float>&)> _vector_func;
+    std::function<void(const Vector<float>&, uint, uint, const Vector<float>&, Vector<float>&)> _vector_func_grad;
+    // const std::function<float(float)>& _func; => note: this leads to this variable value not assigned
 public:
-    MapFunctor(std::function<double(double)> func, 
-            std::function<double(double)> func_grad) : UnFunctor("Map"), 
+    MapFunctor(std::function<float(float)> func, 
+            std::function<float(float)> func_grad) : UnFunctor("Map"), 
     _func(func), _func_grad(func_grad), _first_match_dims(0)
     {
     }
 
-    MapFunctor(std::function<void(const Vector<double>&, uint, uint, Vector<double>&)> func,
-            std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)> func_grad,
+    MapFunctor(std::function<void(const Vector<float>&, uint, uint, Vector<float>&)> func,
+            std::function<void(const Vector<float>&, uint, uint, const Vector<float>&, Vector<float>&)> func_grad,
             uint first_match_dims = 0) : UnFunctor("Map"),
     _vector_func(func), _vector_func_grad(func_grad), _vector_mode(true), _first_match_dims(first_match_dims)
     {
     } 
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         if (!_vector_mode)
             x.map(y, _func);
@@ -413,7 +530,7 @@ public:
             x.map(y, _vector_func, _first_match_dims);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         if (!_vector_mode)
             x.map_grad(y, y_grad, x_grad, _func_grad);
@@ -427,19 +544,19 @@ public:
 class Dropout : public UnFunctor
 {
 private:
-    double _p;
+    float _p;
 
 public:
-    Dropout(double p, uint move_to) : UnFunctor(), _p(p)
+    Dropout(float p, uint move_to) : UnFunctor(), _p(p)
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         // use p probability to make one elem to be 0
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         // for the y that is not zero, just pass y_grad
     }
@@ -449,22 +566,22 @@ public:
 class Map : public UnFunctor
 {
 private:
-    const std::function<double(double)> &_map_func;
-    const std::function<double(double, double)> &_map_grad_func;
+    const std::function<float(float)> &_map_func;
+    const std::function<float(float, float)> &_map_grad_func;
 
 public:
-    Map(const std::function<double(double)> &map_func, const std::function<double(double, double)> &map_grad_func,
+    Map(const std::function<float(float)> &map_func, const std::function<float(float, float)> &map_grad_func,
         int last_work_dims = -1, bool add_to = false, int t1_id = -1)
         : UnFunctor(last_work_dims, add_to, t1_id), _map_func(map_func), _map_grad_func(map_grad_func)
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
         x.map(_map_func, y, _last_work_dims, _add_to, _t1_id);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         assert(x.size() == y_grad.size());
 
@@ -480,22 +597,22 @@ public:
     {
     }
 
-    virtual double map(double x) const = 0;
+    virtual float map(float x) const = 0;
 
-    virtual double map_grad(double x, double y_grad) const = 0;
+    virtual float map_grad(float x, float y_grad) const = 0;
 
-    virtual void forward(const TensorD<double> &x, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x, TensorD<float> &y) const override
     {
-        x.map([this](double x) -> double
+        x.map([this](float x) -> float
               { return this->map(x); },
               y, _last_work_dims, _add_to, _t1_id);
     }
 
-    virtual void backward(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) const override
+    virtual void backward(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) const override
     {
         assert(x.size() == y_grad.size());
 
-        x.map([this](double x, double y_grad) -> double
+        x.map([this](float x, float y_grad) -> float
               { return this->map_grad(x, y_grad); },
               y_grad, x_grad, _last_work_dims, _add_to, _t1_id);
     }

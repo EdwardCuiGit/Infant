@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../inc/2.operators/operator_base.h"
-#include "../../inc/2.operators/attentions.h"
-#include "../../inc/2.operators/norm.h"
-#include "../../inc/2.operators/fc.h"
+#include "inc/2.operators/operator_base.h"
+#include "inc/2.operators/attentions.h"
+#include "inc/2.operators/norm.h"
+#include "inc/2.operators/fc.h"
 
 // below supports encoder_decoder and decoder_only
 // variant projection op: tensor<N, L, H> -> tensor<N, L', H>
@@ -30,8 +30,11 @@ public:
                bool has_embedding = false, uint dict_size = 1,
                bool has_position_embedding = false,
                bool has_padding_mask = false,
-               uint hidden_dim = 1, uint node_len = 1, uint multi_head = 1, double dk = 1.0,
+               uint hidden_dim = 1, uint node_len = 1, uint multi_head = 1, float dk = 1.0,
                uint fc_intermediate_factor = 4,
+               bool has_moe = false,
+               uint total_experts = 2, uint active_experts = 1,
+               bool has_mla = false,
                bool has_bias = false, TensorInit_Types init_type = TensorInit_Types::Gaussian, TensorInit_Types bias_init_type = TensorInit_Types::Zero,
                const LayerNorm::Config &lm = LayerNorm::Config()) : ConfigBase("Transformer")
         {
@@ -43,7 +46,7 @@ public:
             this->has_position_embedding() = has_position_embedding;
             this->has_padding_mask() = has_padding_mask;
             this->decoder_sa() = Attention::Config(hidden_dim, node_len, multi_head, false, dk, false,
-                                                   fc_intermediate_factor, has_bias, init_type, bias_init_type, lm);
+                                                   fc_intermediate_factor, has_moe, total_experts, active_experts, has_mla, has_bias, init_type, bias_init_type, lm);
         }
     };
 
@@ -113,14 +116,14 @@ public:
     dict_id == 2: <end>
 
     for train: xs[0] is input sequence, xs[1] is target sequence
-    x[0]: [batch_size, node_len], each double represent one word id
-    x[1]: [batch_size, node_len], each double represent one word id
+    x[0]: [batch_size, node_len], each float represent one word id
+    x[1]: [batch_size, node_len], each float represent one word id
     x[0] is like 'what's the capital of China?
     x[1] is similar, represents target text sequence
     y[0]:  single value, loss
     for inference: xs[0] is input sequence
-    x[0]: [batch_size, node_len], each double represent one word id
-    y[0]: [batch_size, node_len], each double represent one word id
+    x[0]: [batch_size, node_len], each float represent one word id
+    y[0]: [batch_size, node_len], each float represent one word id
     */
     virtual TensorList forward(const TensorList &xs) const override
     {
@@ -132,8 +135,7 @@ public:
             // TODO: below encode, decode methods should join the graph, so that grad can pass to input_embedding and output_projection?
             if (_c.has_padding_mask())
             {
-                x0_padding_mask = x0.map([](double v){return v != 0 ? 1.0 : 0.0; },
-                [](double v){return v != 0 ? 1.0 : 0.0; });
+                x0_padding_mask = x0.replace(0.0f, 0.0f, 1.0f);
             }
 
             x0 = x0.encode_by_dict(_embedding); // for last dim's each id, find in input_embedding, and build a new one
@@ -152,29 +154,11 @@ public:
             Tensor x1_padding_mask;
             if (_c.has_embedding())
             {
-                x1 = x1.map(
-                    [](const Vector<double>& x, uint start, uint len, Vector<double>& y)
-                    {
-                        if (len > 0) y[start] = 1; // <start> node;
-                        for (uint i = 1; i < len; ++i)
-                        {
-                            y[start + i] = x[start + i - 1]; // note: <end> may be skipped
-                        }   
-                    },
-                    [](const Vector<double>& x, uint start, uint len, const Vector<double>& y_grad, Vector<double>& x_grad)
-                    {
-                        for (uint i = 0; i < len - 1; ++i)
-                        {
-                            x_grad[start + i] += y_grad[start + i+1];
-                        }   
-
-                    }, 1);
-
+                x1 = x1.insert(0, 1, 1);
 
                 if (_c.has_padding_mask())
                 {
-                    x1_padding_mask = x1.map([](double v){return v != 0 ? 1.0 : 0.0;},
-                    [](double v){return v != 0 ? 1.0 : 0.0; });
+                    x1_padding_mask = x1.replace(0.0f, 0.0f, 1.0f);
                 }
 
                 x1 = x1.encode_by_dict(_embedding);
@@ -401,7 +385,7 @@ private:
         Tensor curr_nodes_padding_mask; // no mask for curr_node;
         if (_c.has_padding_mask())
         {
-            curr_nodes_padding_mask = curr_nodes.map([](double v) { return 1.0; }, [](double v) { return 1.0; });
+            curr_nodes_padding_mask.reset(curr_nodes.dim(), TensorInit_Types::One);
         }
 
         // note: we used k_cache, v_cache to store k/v values from previous node, as more node generated, these 2 cache tensors keep growing
@@ -420,10 +404,20 @@ private:
                 // step-1: self-attentions
                 // [batch_size, input_dim] * [multi_head, output_dim, input_dim] => [batch_size, multi_head, output_dim]
 
-                // this will return both new y, q, and also update k/v_cache
-                TensorList ys = _decoder_self_attentions[layer]->forward({curr_nodes, k_cache[layer], v_cache[layer]}, false, false, true);
-                k_cache[layer] = ys[2];
-                v_cache[layer] = ys[3];
+                TensorList ys;
+                if (!_c.decoder_sa().has_mla())
+                {
+                    // this will return both new y, q, and also update k/v_cache
+                    ys = _decoder_self_attentions[layer]->forward({curr_nodes, k_cache[layer], v_cache[layer]}, false, false, true);
+                    k_cache[layer] = ys[2];
+                    v_cache[layer] = ys[3];
+                }
+                else
+                {
+                    ys = _decoder_self_attentions[layer]->forward({curr_nodes, k_cache[layer]}, false, false, true);
+                    k_cache[layer] = ys[2];
+                }
+
 
                 // step-2: cross_attention + fc
                 // note: this must be single node mode execution

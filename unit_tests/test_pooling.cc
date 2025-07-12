@@ -1,6 +1,6 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/2.operators/pooling.h"
+#include "inc/2.operators/pooling.h"
 
 class TestPooling: public TestClass
 {

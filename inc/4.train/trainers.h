@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../4.train/raw_trainer.h"
+#include "inc/4.train/raw_trainer.h"
 
-#include "../3.network/sample_cnn.h"
-#include "../3.network/transformer.h"
+#include "inc/3.network/sample_cnn.h"
+#include "inc/3.network/transformer.h"
 #include <filesystem>
 
 class SampleCnnTrainer: public RawTrainer
@@ -11,6 +11,7 @@ class SampleCnnTrainer: public RawTrainer
 public:
     bool train(const Tensor &x, const Tensor &z, TrainerConfig trainer_config) const
     {
+        trainer_config.is_print_functor = true;
         Ptr<Operator> network = std::make_shared<SampleCnn>();
         InMemoryDataLoader x_loader(x);
         InMemoryDataLoader z_loader(z);
@@ -28,11 +29,11 @@ public:
         TrainerConfig config;
         config.iterations = 200;
         config.mini_batch = 200;
-        config.is_print_functor = true;
+        config.is_print_functor = false;
         config.optim_config.learning_rate = 0.1;
-        config.training_data_file_path = "arithmetic_input.txt";
-        config.label_data_file_path= "arithmetic_output.txt";
-        config.model_save_path = "transformer_model.txt";
+        config.training_data_file_path = "C:/Code/EdwardCodeWorkSpace/Infant/unit_tests/arithmetic_input.txt";
+        config.label_data_file_path= "C:/Code/EdwardCodeWorkSpace/Infant/unit_tests/arithmetic_output.txt";
+        config.model_save_path = "C:/Code/EdwardCodeWorkSpace/Infant/unit_tests/transformer_model.txt";
 
         auto curr_dir = std::filesystem::current_path();
 

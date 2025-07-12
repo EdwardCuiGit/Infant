@@ -1,5 +1,5 @@
-#include "../../inc/1.functors/bin_func.h"
-#include "../../inc/1.functors/tensor_node.h"
+#include "inc/1.functors/bin_func.h"
+#include "inc/1.functors/tensor_node.h"
 
 void BinFunctor::forward(const TensorList &x, TensorList &y) const
 {
@@ -7,6 +7,7 @@ void BinFunctor::forward(const TensorList &x, TensorList &y) const
     assert(y.size() == 1);
 
     forward(x[0].data(), x[1].data(), y[0].data());
+    assert(check_isnan(y) == -1);
 }
 
 void BinFunctor::backward(TensorList &x, const TensorList &y)
@@ -15,4 +16,5 @@ void BinFunctor::backward(TensorList &x, const TensorList &y)
     assert(y.size() == 1);
 
     backward(x[0].data(), x[1].data(), y[0].data(), y[0].grad(), x[0].grad(), x[1].grad());
+    assert(check_isnan(x) == -1);
 }

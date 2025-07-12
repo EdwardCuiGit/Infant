@@ -32,15 +32,15 @@ class BatchNorm2d : public NormBase
 {
 private:
     Tensor _alpha, _beta;
-    mutable TensorD<double> _running_mean, _running_var; // assigned but not used
+    mutable TensorD<float> _running_mean, _running_var; // assigned but not used
     mutable uint _num_batches_tracked;
     uint _channels;
-    double _momentum;
+    float _momentum;
     bool _affine;
     bool _track_running_stats;
 
 public:
-    BatchNorm2d(uint channels, double momentum = 0.1, bool affine = true, bool track_running_stats = true)
+    BatchNorm2d(uint channels, float momentum = 0.1, bool affine = true, bool track_running_stats = true)
         : NormBase(nullptr, "BatchNorm2d"), _channels(channels), _momentum(momentum), _affine(affine), _track_running_stats(track_running_stats)
     {
         assert(channels > 0);
@@ -76,7 +76,7 @@ public:
 
         Tensor y = x_c.swap(0, 1);
 
-        double exp_avg_factor = _momentum;
+        float exp_avg_factor = _momentum;
         if (Environment::Is_Train() && _track_running_stats)
         {
             _num_batches_tracked++;
@@ -105,11 +105,11 @@ public:
         const Vector<uint> last_dims() const { return access_uint_vector("last_dims"); } 
         // const Vector<uint> last_dims; // note: we can't use T& as class members
 
-        DEFINE_FIELD(double, momentum, 0.1);
+        DEFINE_FIELD(float, momentum, 0.1);
         DEFINE_FIELD(bool, affine, true);
         DEFINE_FIELD(bool, track_running_stats, false);
 
-        Config(const Vector<uint>& last_dims = {}, bool has_lm = false, double momentum = 0.1, bool affine = true, bool track_running_stats = false)
+        Config(const Vector<uint>& last_dims = {}, bool has_lm = false, float momentum = 0.1, bool affine = true, bool track_running_stats = false)
         : ConfigBase("LayerNorm")
         {
             this->has_lm() = has_lm;
@@ -124,7 +124,7 @@ private:
     Config _c;
     Tensor _alpha, _beta;
     // TODO: _running_mean & _running_var & _num_batches_tracked only used in first_forward, and we need to keep this LayerNorm in the graph
-    mutable TensorD<double> _running_mean, _running_var; // assigned but not used
+    mutable TensorD<float> _running_mean, _running_var; // assigned but not used
     mutable uint _num_batches_tracked;
 public:
     // LayerNorm() : NormBase(&_c, "LayerNorm"){}
@@ -170,7 +170,7 @@ public:
             y.mul_(_alpha, 1, 0, 0, last_dims).add_(_beta, 1, 1, 0, 0, last_dims);
         }
 
-        double exp_avg_factor = _c.momentum();
+        float exp_avg_factor = _c.momentum();
         if (Environment::Is_Train() && _c.track_running_stats())
         {
             _num_batches_tracked++;
@@ -189,5 +189,37 @@ public:
     virtual bool is_const() const
     {
         return !(_c.has_lm() && Environment::Is_Train() && _c.track_running_stats());
+    }
+};
+
+class RMSNorm : public NormBase
+{
+public:
+    struct Config : ConfigBase
+    {
+        DEFINE_FIELD(bool, enabled, false);
+        DEFINE_FIELD(float, gamma, 1.0f);
+
+        Config(bool enabled = false, float gamma = 1.0f)
+        : ConfigBase("RMSNorm")
+        {
+            this->enabled() = enabled;
+            this->gamma() = gamma;
+        }
+    };
+
+private:
+    Config _c;
+
+public:
+    RMSNorm(const Config& c) : NormBase(&_c, "RMSNorm"), _c(c)
+    {
+    }
+
+    virtual Tensor forward(const Tensor &x) const override
+    {
+        if (!_c.enabled())
+            return x;
+        return x.rms_norm(_c.gamma());
     }
 };

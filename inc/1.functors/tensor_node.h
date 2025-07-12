@@ -1,6 +1,7 @@
 #pragma once
 #include "bin_func.h"
 #include "un_func.h"
+#include "functor_graph.h"
 
 /*
 there are two options to implement pointer based Tensor:
@@ -15,7 +16,7 @@ class FunctorNode;
 typedef Ptr<FunctorNode> PFunctorNode;
 typedef Array<PFunctorNode> FunctorNodePList;
 
-class TensorN : public TensorD<double>
+class TensorN : public TensorD<float>
 {
     friend class Tensor;
     friend class FunctorGraph;
@@ -32,11 +33,11 @@ protected:
     but else, we need to sum up to output_grad;
     TODO: no need to store data if it's only user for up node's output, even not, we could create thread-safe add_ func
     Actually in this new structure, we just need to add_to grad during multiple downstream functor's backward() func*/
-    TensorD<double> grad;
+    TensorD<float> grad;
 
     // not very good design to put momentum here since only parameter Tensors will use momentum
     // ideally should create Parameter sub class to inherit from Tensor
-    TensorD<double> momentum;
+    TensorD<float> momentum;
 
     // all the FunctorNodes which will use this TensorNode's data as input
     FunctorNodePList down_functors;
@@ -67,7 +68,7 @@ public:
         this->get()->is_param = is_param;
     }
 
-    Tensor(const Vector<uint> &dim, const Vector<double>& data, const std::string &id = "", bool is_param = false)
+    Tensor(const Vector<uint> &dim, const Vector<float>& data, const std::string &id = "", bool is_param = false)
     {
         this->Ptr<TensorN>::reset(new TensorN());
         this->reset(dim, data);
@@ -75,16 +76,16 @@ public:
         this->get()->is_param = is_param;
     }
 
-    static Tensor Deep_Upgrade(const TensorD<double> &x);
+    static Tensor Deep_Upgrade(const TensorD<float> &x);
 
     // be catious for these weak_upgrade/weak_downgrade, TensorD.vector & dim are both shared
-    static Tensor Weak_Upgrade(const TensorD<double> &x);
+    static Tensor Weak_Upgrade(const TensorD<float> &x);
 
-    static TensorList Weak_Upgrade(const TensorDArray<double> &x);
+    static TensorList Weak_Upgrade(const TensorDArray<float> &x);
 
-    static TensorDArray<double> Weak_Data_Downgrade(const TensorList &x);
+    static TensorDArray<float> Weak_Data_Downgrade(const TensorList &x);
 
-    static void Weak_Both_Downgrade(const TensorList &x, TensorDArray<double> &data, TensorDArray<double> &grad);
+    static void Weak_Both_Downgrade(const TensorList &x, TensorDArray<float> &data, TensorDArray<float> &grad);
 
     inline Tensor reset(const Vector<uint> &dim, TensorInit_Types t = TensorInit_Types::None)
     {
@@ -94,7 +95,7 @@ public:
         return *this;
     }
 
-    inline void reset(const Vector<uint> &dim, const Vector<double>& data)
+    inline void reset(const Vector<uint> &dim, const Vector<float>& data)
     {
         this->get()->reset(dim, data);;
         this->get()->grad.reset(dim, TensorInit_Types::Zero);
@@ -107,7 +108,7 @@ public:
         this->grad().weak_copy(x.grad());
     }
 
-    inline static Tensor From_Data(const TensorD<double> &x)
+    inline static Tensor From_Data(const TensorD<float> &x)
     {
         Tensor res;
         res.reset(x.dim());
@@ -127,7 +128,7 @@ public:
 
     USED inline Tensor decode__() const
     {
-        TensorD<double> res;
+        TensorD<float> res;
         this->data().decode__(res);
         return Tensor::From_Data(res);
     }
@@ -176,12 +177,12 @@ public:
     }
 
     // note: only check data, don't check grad, momentum, id, etc.
-    inline bool equals_to(const Tensor &x, double noise_level = 0.00001) const
+    inline bool equals_to(const Tensor &x, float noise_level = 0.00001) const
     {
         return this->get()->equals_to(x.data(), noise_level);
     }
 
-    inline bool equals_to(const Vector<uint>& dim, const Vector<double>& vector, double noise_level = 0.00001) const
+    inline bool equals_to(const Vector<uint>& dim, const Vector<float>& vector, float noise_level = 0.00001) const
     {
         return this->get()->equals_to(dim, vector, noise_level);
     }
@@ -216,27 +217,27 @@ public:
         this->get()->is_auto_grad = yes;
     }
 
-    inline TensorD<double> &data()
+    inline TensorD<float> &data()
     {
         return *this->get();
     }
 
-    inline const TensorD<double> &data() const
+    inline const TensorD<float> &data() const
     {
         return *this->get();
     }
 
-    inline TensorD<double> &grad()
+    inline TensorD<float> &grad()
     {
         return this->get()->grad;
     }
 
-    inline TensorD<double> &momentum()
+    inline TensorD<float> &momentum()
     {
         return this->get()->momentum;
     }
 
-    inline const TensorD<double> &grad() const
+    inline const TensorD<float> &grad() const
     {
         return this->get()->grad;
     }
@@ -245,7 +246,7 @@ public:
     // 0. these are template functions that could call any Functor directly, no need below specific function names
     // create parameter variant function f<Combine>, f<Sum>, and then no need to create one new function after a new functor is built
 
-    static void fmm(PFunctor func, const TensorList &x, TensorList &y);
+    /*static void fmm(PFunctor func, const TensorList &x, TensorList &y);
 
     template <typename T, typename... Args>
     const Tensor f(const Tensor &x2, Args &&...args) const;
@@ -263,28 +264,121 @@ public:
     TensorList fm(Args &&...args) const;
 
     template <typename T, typename... Args>
-    static void fmmn(const TensorList &x, TensorList &y, Args &&...args);
+    static void fmmn(const TensorList &x, TensorList &y, Args &&...args);*/
+
+    // 0. these are template functions that could call any Functor directly, no need below specific function names
+    template <typename T, typename... Args>
+    const Tensor f(const Tensor &x2, Args &&...args) const
+    {
+        PFunctor func = std::make_shared<T>(args...);
+        TensorList x{*this, x2}, y{Tensor()};
+        // LOG_INFO("f: " << func->type());
+        func->forward(x, y);
+        y[0].grad().reset(y[0].data().dim(), TensorInit_Types::Zero);
+
+        if (FunctorGraph::singleton().is_auto_grad() && this->is_auto_grad())
+        {
+            FunctorGraph::singleton().add(func, x, y);
+        }
+
+        return y[0];
+    }
+
+    template <typename T, typename... Args>
+    Tensor &f_(const Tensor &x2, Args &&...args)
+    {
+        PFunctor func = std::make_shared<T>(args...);
+        TensorList x{*this, x2}, y{Tensor()};
+        // LOG_INFO("f_: " << func->type());
+        func->forward(x, y);
+        y[0].grad().reset(y[0].data().dim(), TensorInit_Types::Zero);
+
+        if (FunctorGraph::singleton().is_auto_grad() && this->is_auto_grad())
+        {
+            FunctorGraph::singleton().add(func, x, y);
+        }
+
+        // put it after _g.add to ensure original this->get() is not released
+        this->Ptr<TensorN>::operator=(y[0]);
+        return *this;
+    }
+
+    static void fmm(PFunctor func, const TensorList &x, TensorList &y)
+    {
+        // LOG_INFO("fmm: " << func->type());
+        func->forward(x, y);
+        assert(x.size() > 0);
+        if (FunctorGraph::singleton().is_auto_grad() && x[0].is_auto_grad())
+        {
+            FunctorGraph::singleton().add(func, x, y);
+        }
+    }
+
+    template <typename T, typename... Args>
+    const Tensor f(Args &&...args) const
+    {
+        PFunctor func = std::make_shared<T>(args...);
+        TensorList x{*this}, y{Tensor()};
+
+        fmm(func, x, y);
+        y[0].grad().reset(y[0].data().dim(), TensorInit_Types::Zero);
+
+        return y[0];
+    }
+
+    template <typename T, typename... Args>
+    Tensor &f_(Args &&...args)
+    {
+        PFunctor func = std::make_shared<T>(args...);
+        TensorList x{*this}, y{Tensor()};
+        fmm(func, x, y);
+        y[0].grad().reset(y[0].data().dim(), TensorInit_Types::Zero);
+
+        // put it after _g.add to ensure original this->get() is not released
+        this->Ptr<TensorN>::operator=(y[0]);
+        return *this;
+    }
+
+    template <typename T, typename... Args>
+    TensorList fm(Args &&...args) const
+    {
+        PFunctor func = std::make_shared<T>(args...);
+        TensorList x{*this}, y;
+
+        fmm(func, x, y);
+
+        return y;
+    }
+
+    template <typename T, typename... Args>
+    static void fmmn(const TensorList &x, TensorList &y, Args &&...args)
+    {
+        PFunctor func = std::make_shared<T>(args...);
+        // LOG_INFO("fmmn: " << func->type());
+        func->forward(x, y);
+    }
+
 
 public:
     // 1: below are binary ops
-    USED inline Tensor add(const Tensor &x2, double alpha_x1 = 1.0, double alpha_x2 = 1.0, double beta = 0.0,
+    USED inline Tensor add(const Tensor &x2, float alpha_x1 = 1.0, float alpha_x2 = 1.0, float beta = 0.0,
                            uint first_match_dims = 0, int last_work_dims = -1) const
     {
         return f<Add>(x2, alpha_x1, alpha_x2, beta, first_match_dims, last_work_dims);
     }
 
-    USED inline Tensor &add_(const Tensor &x2, double alpha_x1 = 1.0, double alpha_x2 = 1.0, double beta = 0.0,
+    USED inline Tensor &add_(const Tensor &x2, float alpha_x1 = 1.0, float alpha_x2 = 1.0, float beta = 0.0,
                              uint first_match_dims = 0, int last_work_dims = -1)
     {
         return f_<Add>(x2, alpha_x1, alpha_x2, beta, first_match_dims, last_work_dims);
     }
 
-    USED inline Tensor mul(const Tensor &x2, double alpha = 1.0, double beta = 0.0, uint first_match_dims = 0, int last_work_dims = -1) const
+    USED inline Tensor mul(const Tensor &x2, float alpha = 1.0, float beta = 0.0, uint first_match_dims = 0, int last_work_dims = -1) const
     {
         return f<Mul>(x2, alpha, beta, first_match_dims, last_work_dims);
     }
 
-    USED inline Tensor &mul_(const Tensor &x2, double alpha = 1.0, double beta = 0.0, uint first_match_dims = 0, int last_work_dims = -1)
+    USED inline Tensor &mul_(const Tensor &x2, float alpha = 1.0, float beta = 0.0, uint first_match_dims = 0, int last_work_dims = -1)
     {
         return f_<Mul>(x2, alpha, beta, first_match_dims, last_work_dims);
     }
@@ -309,54 +403,55 @@ public:
         return f<Euclidean>(x2, first_match_dims, last_work_dims);
     }
 
+    // note: map function can't be implemented by cuda, can be used for protoyping in cpu
     // 2: below are unary ops
-    USED inline Tensor map(const std::function<double(double)>& func, 
-    const std::function<double(double)>& func_grad) const
+    USED inline Tensor map(const std::function<float(float)>& func, 
+    const std::function<float(float)>& func_grad) const
     {
         return f<MapFunctor>(func, func_grad);
     }
 
-    USED inline Tensor map_(const std::function<double(double)>& func, 
-    const std::function<double(double)>& func_grad)
+    USED inline Tensor map_(const std::function<float(float)>& func, 
+    const std::function<float(float)>& func_grad)
     {
         return f_<MapFunctor>(func, func_grad);
     }
 
-    USED inline Tensor map(const std::function<void(const Vector<double>&, uint, uint, Vector<double>&  )>& func,
-    const std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)>& func_grad,
+    USED inline Tensor map(const std::function<void(const Vector<float>&, uint, uint, Vector<float>&  )>& func,
+    const std::function<void(const Vector<float>&, uint, uint, const Vector<float>&, Vector<float>&)>& func_grad,
     int last_work_dims = -1) const
     {
         return f<MapFunctor>(func, func_grad, last_work_dims);
     }
 
-    USED inline Tensor &map_(const std::function<void(const Vector<double>&, uint, uint, Vector<double>&)>& func, 
-    const std::function<void(const Vector<double>&, uint, uint, const Vector<double>&, Vector<double>&)>& func_grad,
+    USED inline Tensor &map_(const std::function<void(const Vector<float>&, uint, uint, Vector<float>&)>& func, 
+    const std::function<void(const Vector<float>&, uint, uint, const Vector<float>&, Vector<float>&)>& func_grad,
     int last_work_dims = -1)
     {
         return f_<MapFunctor>(func, func_grad, last_work_dims);
     }
 
-    USED inline Tensor linear(double alpha = 1.0, double beta = 0.0, int last_work_dims = -1) const
+    USED inline Tensor linear(float alpha = 1.0, float beta = 0.0, int last_work_dims = -1) const
     {
         return f<Linear>(alpha, beta, last_work_dims);
     }
 
-    inline Tensor &linear_(double alpha = 1.0, double beta = 0.0, int last_work_dims = -1)
+    inline Tensor &linear_(float alpha = 1.0, float beta = 0.0, int last_work_dims = -1)
     {
         return f_<Linear>(alpha, beta, last_work_dims);
     }
 
-    USED inline Tensor pow(double n, double bias = 0, int last_work_dims = -1) const
+    USED inline Tensor pow(float n, float bias = 0, int last_work_dims = -1) const
     {
         return f<Pow>(n, bias, last_work_dims);
     }
 
-    USED inline Tensor ln(double bias = 0, int last_work_dims = -1) const
+    USED inline Tensor ln(float bias = 0, int last_work_dims = -1) const
     {
         return f<Ln>(bias, last_work_dims);
     }
 
-    inline Tensor &ln_(double bias = 0, int last_work_dims = -1)
+    inline Tensor &ln_(float bias = 0, int last_work_dims = -1)
     {
         return f_<Ln>(bias, last_work_dims);
     }
@@ -379,6 +474,26 @@ public:
     USED inline Tensor &activation_(Activation_Types act_type, int last_work_dims = -1)
     {
         return f_<Activation>(act_type, last_work_dims);
+    }
+
+    USED inline Tensor rms_norm(float gamma= 1.0f, int last_work_dims = -1) const
+    {
+        return f<RmsNorm>(gamma, last_work_dims);
+    }
+
+    USED inline Tensor replace(float cond_value, float if_value, float else_value) const
+    {
+        return f<Replace>(cond_value, if_value, else_value);
+    }
+
+    USED inline Tensor insert(uint pos, float value, int last_work_dims = -1) const
+    {
+        return f<Insert>(pos, value, last_work_dims);
+    }
+
+    USED inline Tensor merge(const Tensor &x2, int dim = 0) const
+    {
+        return f<Merge>(x2, dim);
     }
 
     inline Tensor sum(int last_work_dims = -1) const
@@ -437,14 +552,29 @@ public:
         return f<Inflate>(dims);
     }
 
-    USED inline Tensor squeeze() const
+    USED inline Tensor squeeze(int dim = -1) const
     {
-        return f<Squeeze>();
+        return f<Squeeze>(dim);
+    }
+
+    USED inline Tensor unsqueeze(uint dim) const
+    {
+        return f<Unsqueeze>(dim);
+    }
+
+    USED inline Tensor reshape(const Vector<uint> &dim) const
+    {
+        return f<Reshape>(dim);
     }
 
     USED inline Tensor subset(const Vector<uint> &dim, uint offset) const
     {
         return f<Subset>(dim, offset);
+    }
+
+    USED inline Tensor dropout(float p) const
+    {
+        return f<Dropout>(p);
     }
 
     // divide one tensor to be multiple tensors
@@ -466,6 +596,36 @@ public:
         return f_<Append>(x, dim_to_inc);
     }
 
+    USED inline TensorList where(CompareTypes type, float v) const
+    {
+        return fm<Where>(type, v);
+    }
+
+    USED inline TensorList topk(uint k) const
+    {
+        return fm<TopK>(k);
+    }
+
+    USED inline Tensor index(const TensorList &indices, bool cross = false) const
+    {
+        auto func = std::make_shared<Index>(cross);
+        TensorList x, y;
+        x.push_back(*this);
+        x.append(indices);
+        fmm(func, x, y);
+        return y[0];
+    }
+
+    USED inline Tensor assign(const Tensor &values, const Tensor &indices) const
+    {
+        auto func = std::make_shared<Assign>();
+        TensorList x, y;
+        x.push_back(*this);
+        x.push_back(values);
+        x.push_back(indices);
+        fmm(func, x, y);
+        return y[0];
+    }
 
     /*    // below are high level operators
         inline Tensor fc(uint input_dim, uint output_dim, bool has_bias = false,

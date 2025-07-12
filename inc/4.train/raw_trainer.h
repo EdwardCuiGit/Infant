@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../4.train/data_loader.h"
+#include "inc/4.train/data_loader.h"
 #include "optimizer_base.h"
-#include "../1.functors/functor_graph.h"
+#include "inc/1.functors/functor_graph.h"
 
 struct TrainerConfig
 {
@@ -41,7 +41,7 @@ public:
         uint eporch = 0;
         uint total_samples = 0;
         uint samples_per_eporch = 0;
-        Vector<double> losses;
+        Vector<float> losses;
         FunctorGraph::singleton().reset();
         TensorList ys;
         for (uint i = 0; i < trainer_config.iterations; ++i)
@@ -75,7 +75,7 @@ public:
 
                 Tensor loss = ys[0];
                 FunctorGraph::singleton().stop_auto_grad();
-                double loss_value = loss.avg().data().first_item();
+                float loss_value = loss.avg().data().first_item();
                 FunctorGraph::singleton().start_auto_grad();
                 losses.push_back(loss_value);
 

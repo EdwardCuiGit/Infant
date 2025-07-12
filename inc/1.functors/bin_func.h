@@ -14,10 +14,10 @@ protected:
     }
 
 public:
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const = 0;
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const = 0;
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                          TensorD<double> &x1_grad, TensorD<double> &x2_grad) const = 0;
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                          TensorD<float> &x1_grad, TensorD<float> &x2_grad) const = 0;
 
     virtual void forward(const TensorList &x, TensorList &y) const override;
 
@@ -38,23 +38,23 @@ public:
 class Add : public BinFunctor
 {
 protected:
-    double _alpha_x1;
-    double _alpha_x2;
-    double _beta;
+    float _alpha_x1;
+    float _alpha_x2;
+    float _beta;
 
 public:
-    Add(double alpha_x1, double alpha_x2, double beta, uint first_match_dims, int last_work_dims)
+    Add(float alpha_x1, float alpha_x2, float beta, uint first_match_dims, int last_work_dims)
         : BinFunctor("Add", first_match_dims, last_work_dims), _alpha_x1(alpha_x1), _alpha_x2(alpha_x2), _beta(beta)
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.add(x2, y, _alpha_x1, _alpha_x2, _beta, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // note: x1, x2, y is not used, only using alpha, save memory if possible
         // TODO: dynamic confirm whether x2_grad needs to calc
@@ -65,22 +65,22 @@ public:
 class Mul : public BinFunctor
 {
 protected:
-    double _alpha;
-    double _beta;
+    float _alpha;
+    float _beta;
 
 public:
-    Mul(double alpha, double beta, uint first_match_dims, int last_work_dims)
+    Mul(float alpha, float beta, uint first_match_dims, int last_work_dims)
         : BinFunctor("Mul", first_match_dims, last_work_dims), _alpha(alpha), _beta(beta)
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.mul(x2, y, _alpha, _beta, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // note: x1, x2, y is not used, only using alpha, save memory if possible
         // TODO: dynamic confirm whether x2_grad needs to calc
@@ -95,13 +95,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.dot(x2, y, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // note: y is not used
         // TODO: dynamic confirm whether x2_grad needs to calc
@@ -117,13 +117,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.mse(x2, y, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // note: y is not used
         // TODO: dynamic confirm whether x2_grad needs to calc
@@ -138,13 +138,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.ce(x2, y, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // TODO: dynamic confirm whether x2_grad needs to calc
         x1.ce_grad(x2, y, y_grad, x1_grad, x2_grad, true, _first_match_dims, _last_work_dims);
@@ -158,13 +158,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.euclidean(x2, y, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // TODO: dynamic confirm whether x2_grad needs to calc
         x1.euclidean_grad(x2, y, y_grad, x1_grad, x2_grad, true, _first_match_dims, _last_work_dims);
@@ -179,13 +179,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.append(x2, y, _dim_to_inc);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         x1.append_grad(x2, y, y_grad, x1_grad, x2_grad, true, _dim_to_inc);
     }
@@ -199,13 +199,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.encode_by_dict(x2, y);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // x1_grad is input tensor, no need to calc grad
         x1.encode_by_dict_grad(x2, y, y_grad, x2_grad);
@@ -220,18 +220,39 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.search_by_dict(x2, y, _padding_id);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // x1_grad is target tensor, no need to calc grad
         x1.search_by_dict_grad(x2, y, y_grad, x2_grad, _padding_id);
     }
 };  
+
+class Merge: public BinFunctor
+{
+    int _dim;
+public:
+    Merge(int dim = 0) : BinFunctor("Merge", 0, 0), _dim(dim)
+    {
+    }
+
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
+    {
+        x1.merge(x2, y, _dim);
+    }
+
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
+    {
+        x1.merge_grad(x2, y, y_grad, x1_grad, x2_grad, _dim);
+    }
+};
+
 
 /*
 class Encode: public BinFunctor
@@ -241,13 +262,13 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x1, const TensorD<double> &x2, TensorD<double> &y) const override
+    virtual void forward(const TensorD<float> &x1, const TensorD<float> &x2, TensorD<float> &y) const override
     {
         x1.encode(x2, y, _first_match_dims, _last_work_dims);
     }
 
-    virtual void backward(const TensorD<double> &x1, const TensorD<double> &x2, const TensorD<double> &y, const TensorD<double> &y_grad,
-                           TensorD<double> &x1_grad, TensorD<double> &x2_grad) const override
+    virtual void backward(const TensorD<float> &x1, const TensorD<float> &x2, const TensorD<float> &y, const TensorD<float> &y_grad,
+                           TensorD<float> &x1_grad, TensorD<float> &x2_grad) const override
     {
         // TODO: dynamic confirm whether x2_grad needs to calc
         x1.encode_grad(x2, y, y_grad, x1_grad, x2_grad, true, _first_match_dims, _last_work_dims);

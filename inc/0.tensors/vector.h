@@ -37,7 +37,7 @@
         reduce:
             num: reduce, sum_func, sum, product, avg, *var, max, min, norm_ln/norm_l1, entropy/binary_entropy, TODO: median,
             bool: all_pos, all_in01
-            double &sum(uint v1_start = 0, int len = -1) const;
+            float &sum(uint v1_start = 0, int len = -1) const;
     */
 
 /*// random init, called in main function's starting
@@ -52,8 +52,6 @@ class Random
 public:
     static std::default_random_engine __global_random_generator;
 };
-
-std::default_random_engine Random::__global_random_generator;
 
 
 template <class T>
@@ -81,6 +79,9 @@ public:
     {
         this->copy(v2);
     }
+
+    /*explicit Vector(T* start, uint size) : Array<T>(start, size)
+    {}*/
 
     inline static Vector<T> Zero(uint size)
     {
@@ -169,18 +170,18 @@ public:
         }
     }*/
 
-    // TODO: only supports double now
-    void set_dist_uniform(double min, double max, uint v1_start = 0, int len = -1)
+    // TODO: only supports float now
+    void set_dist_uniform(float min, float max, uint v1_start = 0, int len = -1)
     {
-        std::uniform_real_distribution<double> dist(min, max);
+        std::uniform_real_distribution<float> dist(min, max);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
     }
 
-    void set_dist_gaussian(double mean, double var, uint v1_start = 0, int len = -1)
+    void set_dist_gaussian(float mean, float var, uint v1_start = 0, int len = -1)
     {
-        std::normal_distribution<double> dist(mean, var);
+        std::normal_distribution<float> dist(mean, var);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
@@ -188,7 +189,7 @@ public:
 
     void set_dist_lognormal(T m, T s, uint v1_start = 0, int len = -1)
     {
-        std::lognormal_distribution<double> dist(m, s);
+        std::lognormal_distribution<float> dist(m, s);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
@@ -196,7 +197,7 @@ public:
 
     void set_dist_cauchy(T n, uint v1_start = 0, int len = -1)
     {
-        std::chi_squared_distribution<double> dist(n);
+        std::chi_squared_distribution<float> dist(n);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
@@ -204,7 +205,7 @@ public:
 
     void set_dist_chi_squared(T n, uint v1_start = 0, int len = -1)
     {
-        std::chi_squared_distribution<double> dist(n);
+        std::chi_squared_distribution<float> dist(n);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
@@ -212,7 +213,7 @@ public:
 
     void set_dist_fisher_f(T m, T n, uint v1_start = 0, int len = -1)
     {
-        std::fisher_f_distribution<double> dist(m, n);
+        std::fisher_f_distribution<float> dist(m, n);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
@@ -220,7 +221,7 @@ public:
 
     void set_dist_student_t(T n, uint v1_start = 0, int len = -1)
     {
-        std::student_t_distribution<double> dist(n);
+        std::student_t_distribution<float> dist(n);
         set_dist([&dist]() -> T
                  { return dist(Random::__global_random_generator); },
                  v1_start, len);
@@ -387,7 +388,7 @@ public:
         return sum_func(Math<T>::multi_op, v2, v1_start, v2_start, len);
     }
 
-    double mse(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
+    float mse(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         if (len < 0)
             len = v2.size() - v2_start;
@@ -398,7 +399,7 @@ public:
     }
 
     // cross entropy, q(v2) values need to be positive
-    double ce(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
+    float ce(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         assert(v2.all_pos(v2_start, len));
         return -1.0 * sum_func([](T px, T qx) -> T
@@ -407,7 +408,7 @@ public:
     }
 
     // binary cross entropy, this/y needs to be binary distribution, py(v2) values need to be positive, loss function
-    double bce(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
+    float bce(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         if (len < 0)
             len = v2.size() - v2_start;
@@ -419,7 +420,7 @@ public:
     }
 
     // KL divergence/Relative Entropy, p is truth, q is prediction
-    double re(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
+    float re(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         assert(all_pos(v1_start, len));
         assert(v2.all_pos(v2_start, len));
@@ -429,7 +430,7 @@ public:
     }
 
     // note: 3 loops here, one loop could be faster;
-    double cosine_distance(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
+    float cosine_distance(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         auto norm_v1 = norm_ln(2.0, v1_start, len);
         auto norm_v2 = v2.norm_ln(2.0, v2_start, len);
@@ -438,7 +439,7 @@ public:
         return dot(v2, v1_start, v2_start, len) / (norm_v1 * norm_v2);
     }
 
-    double euclidean(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
+    float euclidean(const Vector<T> &v2, uint v1_start = 0, uint v2_start = 0, int len = -1) const
     {
         auto res = sum_func([](T x, T y) -> T
                             { return (x - y) * (x - y); },
@@ -542,7 +543,7 @@ public:
             return out;
         }
         
-        double denominator = 0;
+        float denominator = 0;
         map([max_val, &denominator](T e) -> T
             {
                 auto exp_e = std::exp(e - max_val); // Subtract max_val before exp
@@ -559,6 +560,22 @@ public:
     Vector<T> &softmax_(uint v1_start = 0, int len = -1)
     {
         return softmax(*this, v1_start, v1_start, len);
+    }
+
+    Vector<T> &dropout(Vector<T> &out, float p) const
+    {
+        return map([p](T e) -> T
+                   { 
+                    if (Math<T>::rand() < p)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        return e;
+                    }
+                   },
+                   out, 0, 0, this->size(), false);
     }
 
     // 5. unary reduce op: (vector> -> float
@@ -635,7 +652,7 @@ public:
     T max(uint v1_start = 0, int len = -1) const
     {
         return reduce(
-            Math<T>::empty_map, [](T res, T e, uint i) -> T &
+            Math<T>::empty_map, [](T res, T e, uint i) -> T 
             { return e > res ? e : res; },
             v1_start, len);
     }
@@ -643,12 +660,12 @@ public:
     T min(uint v1_start = 0, int len = -1) const
     {
         return reduce(
-            Math<T>::empty_map, [](T res, T e, uint i) -> T &
+            Math<T>::empty_map, [](T res, T e, uint i) -> T 
             { return e < res ? e : res; },
             v1_start, len);
     }
 
-    double norm_ln(double n, uint v1_start = 0, int len = -1) const
+    float norm_ln(float n, uint v1_start = 0, int len = -1) const
     {
         assert(n != 0);
         T res = sum_func([n](T e) -> T
@@ -657,14 +674,14 @@ public:
         return std::pow(res, 1.0 / n);
     }
 
-    double norm_l1(uint v1_start = 0, int len = -1) const
+    float norm_l1(uint v1_start = 0, int len = -1) const
     {
         return sum_func([](T e) -> T
                         { return e >= 0 ? e : -1 * e; },
                         v1_start, len);
     }
 
-    double entropy(uint v1_start = 0, int len = -1) const
+    float entropy(uint v1_start = 0, int len = -1) const
     {
         assert(all_pos(v1_start, len));
         return -1.0 * sum_func([](T px) -> T
@@ -673,7 +690,7 @@ public:
     }
 
     // binary distribution
-    static double Binary_Entropy(double p)
+    static float Binary_Entropy(float p)
     {
         assert(p > 0 && p < 1);
         return -1.0 * (p * std::log2(p) + (1 - p) * std::log2(1 - p));

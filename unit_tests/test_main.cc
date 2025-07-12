@@ -3,13 +3,6 @@
 #include "test_vector.cc"
 #include "test_tensor.cc"
 #include "test_tensor_node.cc"
-#include "../src/1.functors/tensor_node.cc"
-#include "../src/1.functors/functor.cc"
-#include "../src/1.functors/un_func.cc"
-#include "../src/1.functors/unmo_func.cc"
-#include "../src/1.functors/bin_func.cc"
-#include "../src/1.functors/functor_graph.cc"
-#include "../src/2.operators/operator_base.cc"
 #include "test_config_base.cc"
 #include "test_fc.cc"
 #include "test_conv.cc"
@@ -24,6 +17,7 @@
 #include "test_dataloaders.cc"
 #include "test_trainers.cc"
 #include "test_gbdt.cc"
+
 /*
 predefs.h: memory, iostream, limits, cassert
 array.h: predefs.h, vector, initializer_list, algorithm, functional

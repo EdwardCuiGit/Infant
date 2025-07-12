@@ -76,7 +76,7 @@ public:
         std::string line = read_line(i);
         auto fields = split(line, sep);
         // can't exceed allocated size, shall we truncate?
-        assert(output.size() >= fields.size());
+        output.reserve(fields.size());
         for(uint j = 0; j < fields.size(); ++j)
         {
             int v = std::stoi(fields[j]);
@@ -97,7 +97,7 @@ public:
     }
 
     // 0.1 0.2 0.1
-    static void read_double_vector(std::istream& i, Vector<double>& output, const std::string& sep = " ")
+    static void read_float_vector(std::istream& i, Vector<float>& output, const std::string& sep = " ")
     {
         std::string line = read_line(i);
         auto fields = split(line, sep);

@@ -1,39 +1,7 @@
 #pragma once
 
-#include "../1.functors/tensor_node.h"
+#include "inc/1.functors/tensor_node.h"
 #include "config_base.h"
-
-class Environment 
-{
-private:
-    static bool _is_train;
-    static bool _print_functor;
-public:
-    static bool Is_Print_Functor()
-    {
-        return _print_functor;
-    }
-
-    static void Set_Print_Functor(bool yes = true)
-    {
-        _print_functor = yes;
-    }
-
-    static bool Is_Train()
-    {
-        return _is_train;
-    }
-
-    static void Set_Train(bool yes = true)
-    {
-        _is_train = yes;
-    }
-
-    static void Init();
-};
-
-bool Environment::_is_train = false;
-bool Environment::_print_functor = false;
 
 // Learnable Operator: added parameters
 // TODO: add required shape for both input & outputs
@@ -249,9 +217,9 @@ class UnOp : public Operator
 {
 protected:
     UnOp(ConfigBase *ptr, const std::string &type) : Operator(ptr, type) {}
-
+public:
     virtual Tensor forward(const Tensor &x) const = 0;
-
+protected:
     SEALED virtual TensorList forward(const TensorList &x) const override
     {
         assert(x.size() >= 1);
@@ -259,5 +227,3 @@ protected:
         return {y};
     }
 };
-
-Map<std::string, Operator::Operator_Func> Operator::_Op_Factory;
