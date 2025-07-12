@@ -93,27 +93,10 @@ public:
     NOTIMPLEMENTED bool load_model(const std::string& file_name);
 
     // after one iteration, zero out all feature maps
-    void zero_features()
-    {
-        for (Tensor t : _tensors)
-        {
-            // note: this will not zero out parameter values
-            if (!t.is_param())
-            {
-                t.data().clear();
-            }
-        }
-    }
+    void zero_features();
 
     // zero grad for all parameters & features
-    void zero_grads()
-    {
-        // this is covering above parameters
-        for (Tensor t : _tensors)
-        {
-            t.grad().clear();
-        }
-    }
+    void zero_grads();
 
 private:
     static FunctorGraph _g;
@@ -145,5 +128,3 @@ public:
         return _params;
     }
 };
-
-FunctorGraph FunctorGraph::_g;

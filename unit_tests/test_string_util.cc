@@ -6,7 +6,7 @@ class TestStringUtil: public TestClass
 {
 public:
     REGISTER_TEST_CASES(test_trim, test_split, test_read_and_write_uint, test_read_and_write_string, test_assert_next_line,
-    test_read_and_write_double_vector, test_read_and_write_uint_vector)
+    test_read_and_write_float_vector, test_read_and_write_uint_vector)
 
     static void test_trim()
     {
@@ -46,16 +46,16 @@ public:
         StringUtil::assert_next_line(i, "hello");
     }
 
-    static void test_read_and_write_double_vector()
+    static void test_read_and_write_float_vector()
     {
         std::stringstream i, o;
-        Vector<double> v({0.1, 0.3, 0}), v1;
+        Vector<float> v({0.1, 0.3, 0}), v1;
         StringUtil::write_vector(o, v);
         assert(o.str() == "0.1 0.3 0\n");        
 
         i << "0.1 0.3 0.0\n";
         v1.reserve(3);
-        StringUtil::read_double_vector(i, v1);
+        StringUtil::read_float_vector(i, v1);
         assert(v1.equals_to({0.1, 0.3, 0}));
     }
 

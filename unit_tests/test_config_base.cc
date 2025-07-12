@@ -1,8 +1,8 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/2.operators/config_base.h"
-#include "../inc/2.operators/norm.h"
-#include "../inc/2.operators/operator_base.h"
+#include "inc/2.operators/config_base.h"
+#include "inc/2.operators/norm.h"
+#include "inc/2.operators/operator_base.h"
 
 class TestConfigBase: public TestClass
 {
@@ -18,7 +18,7 @@ public:
             DEFINE_FIELD(uint, input_dim, 100);
             DEFINE_FIELD(bool, has_bias, true);
             DEFINE_FIELD(int, a, -1);
-            DEFINE_FIELD(double, b, 0.2);
+            DEFINE_FIELD(float, b, 0.2);
             Vector<uint> &last_dims() { return access_uint_vector("last_dims"); } 
             const Vector<uint> last_dims() const { return access_uint_vector("last_dims"); } 
             DEFINE_SUB_CONFIG(LayerNorm, lm);
@@ -37,14 +37,14 @@ public:
         assert(c.a() == -1);
         c.a() = -2;
         assert(c.a() == -2);
-        assert(c.b() == 0.2);
+        assert(c.b() == 0.2f);
         c.b() = 0.3;
-        assert(c.b() == 0.3);
+        assert(c.b() == 0.3f);
         assert(c.last_dims().equals_to({}));
         c.last_dims().append({0, 2, 1});
         assert(c.last_dims().equals_to({0, 2, 1}));
         assert(c.lm().affine() == true);
-        assert(c.lm().momentum() == 0.1);
+        assert(c.lm().momentum() == 0.1f);
 
         std::stringstream o, o1;
         c.save(o);

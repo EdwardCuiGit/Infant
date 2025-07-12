@@ -110,4 +110,9 @@ public:
     {
         return pre_res * e;
     }
+
+    inline static T rand()
+    {
+        return static_cast<T>(std::rand() * 1.0 / RAND_MAX);
+    }
 };

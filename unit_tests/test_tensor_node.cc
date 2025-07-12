@@ -67,7 +67,7 @@ public:
 
     static void test_upgrades()
     {
-        TensorD<double> td({2, 3}, TensorInit_Types::Ordinal);
+        TensorD<float> td({2, 3}, TensorInit_Types::Ordinal);
         Tensor t = Tensor::Deep_Upgrade(td);
         assert(t.size() == 6);
         assert(t.data().vector()[1] = 1);
@@ -80,7 +80,7 @@ public:
         t1.data().vector()[2] = 3;
         assert(td[2] == 3);
 
-        TensorDArray<double> x({td});
+        TensorDArray<float> x({td});
         TensorList t2 = Tensor::Weak_Upgrade(x);
         assert(t2.size() == 1);
         assert(t2[0].data().vector()[1] = 1);
@@ -90,7 +90,7 @@ public:
     {
         Tensor t1({2, 3}, TensorInit_Types::Ordinal);
         Tensor t2({2, 2}, TensorInit_Types::Ordinal);
-        TensorDArray<double> data, grad;
+        TensorDArray<float> data, grad;
         Tensor::Weak_Both_Downgrade({t1, t2}, data, grad);
         assert(data[0].size() == 6);
         assert(data[1].size() == 4);
@@ -159,7 +159,7 @@ public:
     static void test_var()
     {
         Tensor x({2, 2}, TensorInit_Types::Ordinal), y;
-        TensorD<double> y1, y_grad({2}, TensorInit_Types::One), x_grad;
+        TensorD<float> y1, y_grad({2}, TensorInit_Types::One), x_grad;
         y = x.var(false, 1);
         assert(y.data().vector().equals_to({0.25, 0.25}));
 
@@ -190,7 +190,7 @@ public:
         divide.backward(x.data(), y, x.grad());
 
         assert(x.grad().dim().equals_to({2, 3, 2}));
-        assert(x.grad().vector().equals_to(Vector<double>::One(12)));
+        assert(x.grad().vector().equals_to(Vector<float>::One(12)));
     }
 
     static void test_combine()
@@ -212,11 +212,11 @@ public:
 
         assert(x.size() == 2);
         assert(x[0].grad().dim().equals_to({3, 2}));
-        assert(x[1].grad().vector().equals_to(Vector<double>::One(6)));
+        assert(x[1].grad().vector().equals_to(Vector<float>::One(6)));
     }
 
     static void test_from_data(){
-        TensorD<double> xd({2, 2}, TensorInit_Types::Ordinal);
+        TensorD<float> xd({2, 2}, TensorInit_Types::Ordinal);
         Tensor x = Tensor::From_Data(xd);
         assert(x.dim().equals_to({2, 2}));
         assert(x.data().vector().equals_to({0, 1, 2, 3}));
@@ -272,7 +272,7 @@ public:
     static void test_map(){
         Tensor x({2, 3}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 2, 3, 4, 5});
-        auto y = x.map([](double v) { return v >= 2 ? 1 : 0; }, [](double v) { return v >= 2 ? 1 : 0; });
+        auto y = x.map([](float v) { return v >= 2 ? 1.0f : 0.0f; }, [](float v) { return v >= 2 ? 1.0f : 0.0f ; });
         assert(y.data().vector().equals_to({0, 0, 1, 1, 1, 1}));
     }
 };

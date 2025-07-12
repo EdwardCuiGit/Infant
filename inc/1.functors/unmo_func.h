@@ -7,8 +7,8 @@ class UnMoFunctor : public Functor
 protected:
     int _last_work_dims;
 
-    // void (*forward_fn)(const TensorD<double> &x, TensorList &y) = nullptr;
-    // void (*backward_fn)(const TensorD<double> &x, const TensorD<double> &y, const TensorD<double> &y_grad, TensorD<double> &x_grad) = nullptr;
+    // void (*forward_fn)(const TensorD<float> &x, TensorList &y) = nullptr;
+    // void (*backward_fn)(const TensorD<float> &x, const TensorD<float> &y, const TensorD<float> &y_grad, TensorD<float> &x_grad) = nullptr;
 
 public:
     UnMoFunctor(const std::string& type, int last_work_dims = -1)
@@ -16,9 +16,9 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorList &y) const = 0;
+    virtual void forward(const TensorD<float> &x, TensorList &y) const = 0;
 
-    virtual void backward(const TensorD<double> &x, const TensorList &y, TensorD<double> &x_grad) const = 0;
+    virtual void backward(const TensorD<float> &x, const TensorList &y, TensorD<float> &x_grad) const = 0;
 
     virtual void forward(const TensorList &x, TensorList &y) const override;
 
@@ -42,9 +42,9 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorList &y) const override;
+    virtual void forward(const TensorD<float> &x, TensorList &y) const override;
 
-    virtual void backward(const TensorD<double> &x, const TensorList &y, TensorD<double> &x_grad) const override;
+    virtual void backward(const TensorD<float> &x, const TensorList &y, TensorD<float> &x_grad) const override;
 };
 
 /*class MeanVar : public UnMoFunctor
@@ -58,9 +58,9 @@ public:
     {
     }
 
-    virtual void forward(const TensorD<double> &x, TensorList &y) const override;
+    virtual void forward(const TensorD<float> &x, TensorList &y) const override;
 
-    virtual void backward(const TensorD<double> &x, const TensorList &y, TensorD<double> &x_grad) const override;
+    virtual void backward(const TensorD<float> &x, const TensorList &y, TensorD<float> &x_grad) const override;
 
     OVERRIDE uint output_tensor_count() const
     {

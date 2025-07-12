@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../2.operators/operator_base.h"
+#include "inc/2.operators/operator_base.h"
 
 enum class Optimizer_Types : uint
 {
@@ -12,9 +12,9 @@ struct OptimizerConfig
 {
 public:
     Optimizer_Types optim_type = Optimizer_Types::Sgd;
-    double learning_rate = 0.000001;
-    double weight_decay = 0;
-    double momentum = 0.2;
+    float learning_rate = 0.000001;
+    float weight_decay = 0;
+    float momentum = 0.2;
 };
 
 // How to add new operator: inherit Optimizer, add type to Optimizer_Types, add one row in create(), all in this file
@@ -54,7 +54,7 @@ public:
 
     // during training, lr will be changed
     virtual void step(TensorList &params) const = 0;
-    double learning_rate() const
+    float learning_rate() const
     {
         return _config.learning_rate;
     }
@@ -63,7 +63,7 @@ public:
 class Sgd : public Optimizer
 {
 public:
-    Sgd(double lr, double momentum = 0, double weight_decay = 0) : Optimizer()
+    Sgd(float lr, float momentum = 0, float weight_decay = 0) : Optimizer()
     {
         assert(lr >= 0);
         assert(momentum >= 0);
@@ -97,7 +97,7 @@ public:
                     param.momentum().reset(param.dim(), TensorInit_Types::Zero);
                 }
 
-                TensorD<double> grad_sum;
+                TensorD<float> grad_sum;
                 param.grad().sum(grad_sum);
                 if (grad_sum.first_item() == 0) // address gradient vanishing problem
                 {
@@ -108,12 +108,17 @@ public:
                 //  grad = param->momentum->add_(param->grad(), 0, -1, _config.momentum, 1 - _config.momentum);
                 //  param->add_(grad, 1.0, -1.0 * _config.learning_rate);
                 //  typical formula
-                param.momentum().add(param.grad(), param.momentum(), _config.momentum, 1, 0);
-                param.data().add(param.momentum(), param.data(), 1, -1 * _config.learning_rate, 0);
+                TensorD<float> new_momentum, new_data;
+                param.momentum().add(param.grad(), new_momentum, _config.momentum, 1, 0);
+                param.momentum().deep_copy(new_momentum);
+                param.data().add(param.momentum(), new_data, 1, -1 * _config.learning_rate, 0);
+                param.data().deep_copy(new_data);
             }
             else
             {
-                param.data().add(param.grad(), param.data(), 1, -1 * _config.learning_rate, 0);
+                TensorD<float> new_data;
+                param.data().add(param.grad(), new_data, 1, -1 * _config.learning_rate, 0);
+                param.data().deep_copy(new_data);
             }
         }
     }

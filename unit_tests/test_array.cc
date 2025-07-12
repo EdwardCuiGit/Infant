@@ -1,5 +1,5 @@
 #pragma once
-#include "../inc/0.tensors/array.h"
+#include "inc/0.tensors/array.h"
 #include "unit_test.h"
 #include <iostream>
 #include <sstream>
@@ -11,7 +11,7 @@ public:
 
     static void test_set_funcs()
     {
-        Array<double> a1;
+        Array<float> a1;
         assert(a1.size() == 0);
         a1.push_back(4);
         assert(a1.size() == 1);
@@ -21,14 +21,14 @@ public:
         a1.push_back(5);
         assert(a1.size() == 2);
 
-        Array<double> a2{1, 2, 3};
+        Array<float> a2{1, 2, 3};
         assert(a2[0] == 1);
         assert(a2[2] == 3);
         assert(a2.size() == 3);
         a2.append(a1);
         assert(a2[4] == 5);
 
-        Array<double> a3(3);
+        Array<float> a3(3);
         assert(a3.size() == 3);
         a3[2] = 1;
         a3.copy(a2, 1, 2);
@@ -51,9 +51,9 @@ public:
 
         a3[2] = 1.5;
         a3.set_each(1.6, 2, 2);
-        assert(a3[3] == 1.6);
+        assert(a3[3] == 1.6f);
 
-        Array<double> a4(3);
+        Array<float> a4(3);
         a4.set(0, {0, 1, 2});
         a4.insert(1, {2, 3});
         assert(a4.equals_to({0, 2, 3, 1, 2}));
@@ -63,7 +63,7 @@ public:
         auto a4_copy = a4.clone();
         assert(a4_copy.equals_to({0, 2, 2, 3, 1, 2}));
 
-        Array<double> a5{1, 2};
+        Array<float> a5{1, 2};
         a5.append(a4, 1, 3);
         assert(a5.equals_to({1, 2, 2, 2, 3}));
 

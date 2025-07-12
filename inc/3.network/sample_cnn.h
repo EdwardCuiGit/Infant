@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../2.operators/fc.h"
-#include "../2.operators/conv.h"
-#include "../2.operators/pooling.h"
+#include "inc/2.operators/fc.h"
+#include "inc/2.operators/conv.h"
+#include "inc/2.operators/pooling.h"
 
 class SampleCnn: public Operator
 {

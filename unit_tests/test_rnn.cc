@@ -37,7 +37,7 @@ public:
         TensorList y = rnn.forward({x});
         assert(y.size() == 2);
         assert(y[1].dim().equals_to({1, 3, 2}));
-        assert(y[1].data().vector().equals_to({1, 1, 7*56, 7*56, (9+14*56)*(9+14*56)*(56+9+14*56), (9+14*56)*(9+14*56)*(56+9+14*56)}));
+        assert(y[1].data().vector().equals_to({1.0f, 1.0f, 7*56.0f, 7*56.0f, (9+14*56)*(9+14*56)*(56+9+14*56) * 1.0f, (9+14*56)*(9+14*56)*(56+9+14*56)*1.0f}));
     }
 
     static void test_Gru_forward()

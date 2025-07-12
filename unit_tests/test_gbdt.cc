@@ -1,6 +1,6 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/trees/gbdt.h"
+#include "inc/trees/gbdt.h"
 
 class TestGbdt: public TestClass
 {
@@ -18,7 +18,7 @@ public:
     {
         Gbdt gbdt;
         Gbdt::GbdtEnsemble model;
-        TensorD<double> y;
+        TensorD<float> y;
         gbdt.inference({}, y, model);
     }
 };

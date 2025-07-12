@@ -1,8 +1,9 @@
-#pragma once
-#include "../../inc/1.functors/functor_graph.h"
-#include "../../inc/1.functors/tensor_node.h"
-#include "../../inc/2.operators/operator_base.h"
+#include "inc/1.functors/functor_graph.h"
+#include "inc/1.functors/tensor_node.h"
+#include "inc/2.operators/operator_base.h"
 #include <queue>
+
+FunctorGraph FunctorGraph::_g;
 
 // the graph is built by add(), and link input tensors into the graph, and no need to add_tensor directly to the graph
 void FunctorGraph::add(PFunctor func, const TensorList &inputs, const TensorList &outputs)
@@ -125,7 +126,7 @@ TensorList FunctorGraph::forward(const TensorList &x) const
         // TODO: this support multiple losses
         /*if (LossBase *lop = dynamic_cast<LossBase *>(mop))
         {
-            double loss = lop->get_loss();
+            float loss = lop->get_loss();
             // TODO: move this code to trainer
             LOG_INFO("LOSS:" << loss);
         }*/
@@ -171,7 +172,7 @@ void FunctorGraph::forward_traverse(const std::function<void(FunctorNode &)> &fu
 }
 
 /*
-void backward(const TensorD<double> &weights)
+void backward(const TensorD<float> &weights)
 {
     // first, use each value's weight as their grad
     assert(weights.size() == size());
@@ -253,10 +254,10 @@ void FunctorGraph::backward(const TensorList& output_tensor_grads)
         func->backward(node.inputs, node.outputs);
         if (Environment::Is_Print_Functor())
         {
-            double total_grad = 0;
+            float total_grad = 0;
             for (uint i = 0; i < node.inputs.size(); ++i)
             {
-                TensorD<double> sum_grad;
+                TensorD<float> sum_grad;
                 node.inputs[i].grad().sum(sum_grad);
                 total_grad += sum_grad.first_item();
             }
@@ -320,4 +321,25 @@ void FunctorGraph::backward_traverse(const std::function<void(FunctorNode &)> &f
 
 void FunctorGraph::prune(const Tensor& start_tensor)
 {
+}
+
+void FunctorGraph::zero_features()
+{
+    for (Tensor t : _tensors)
+    {
+        // note: this will not zero out parameter values
+        if (!t.is_param())
+        {
+            t.data().clear();
+        }
+    }
+}
+
+void FunctorGraph::zero_grads()
+{
+    // this is covering above parameters
+    for (Tensor t : _tensors)
+    {
+        t.grad().clear();
+    }
 }

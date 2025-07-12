@@ -1,19 +1,19 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/2.operators/attentions.h"
+#include "inc/2.operators/attentions.h"
 
 class TestAttention: public TestClass
 {
 public:
     REGISTER_TEST_CASES(test_self_attention, test_self_attention_multi_head, test_self_attention_triangle_mode, 
     test_self_attention_single_node, test_cross_attention, test_cross_attention_single_node, test_has_bias, test_has_lm, 
-    test_dk, test_transformer_fc)
+    test_dk, test_transformer_fc, test_moe, test_mla)
 
     static void test_self_attention()
     {
         Tensor x({2, 3, 2}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 2, 3, 4, 5,  0, 1, 2, 3, 4, 5});
-        Attention op(Attention::Config(2, 3, 1, false, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 3, 1, false, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
 
         TensorList ys;
         Tensor q, k, v;
@@ -46,7 +46,7 @@ public:
     {
         Tensor x({2, 3, 2}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 2, 3, 4, 5,  0, 1, 2, 3, 4, 5});
-        Attention op(Attention::Config(2, 3, 2, false, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 3, 2, false, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
 
         TensorList ys;
         Tensor q, k, v;
@@ -80,7 +80,7 @@ public:
     {
         Tensor x({2, 3, 2}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 2, 3, 4, 5,  0, 1, 2, 3, 4, 5});
-        Attention op(Attention::Config(2, 3, 1, false, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 3, 1, false, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
 
         TensorList ys;
         Tensor q, k, v;
@@ -115,7 +115,7 @@ public:
         x.data().vector().set(0, {0, 1, 0, 1});
         TensorList ys(4);
 
-        Attention op(Attention::Config(2, 1, 1, false, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 1, 1, false, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
         // x: [2, 2], wq/wk/wv: [1, 2, 2]
         // q/k/v: [2, 1, 2] => [1, 1, 1, 1]
         // k_cache: [2, 1, 1, 2] => [1, 1, 1, 1]
@@ -162,7 +162,7 @@ public:
         Tensor v({2, 1, 2, 3});
         v.data().vector().set(0, {1, 5, 9, 1, 5, 9, 1, 5, 9, 1, 5, 9});
 
-        Attention op(Attention::Config(2, 3, 1, true, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 3, 1, true, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
         TensorList ys;
         ys = op.forward({x, q, k, v});
         // weights = q.dot(k, 2): [2, 1, 3, 3] => [2, 10, 18,  10, 50, 90,  18, 90, 162, ...]
@@ -189,7 +189,7 @@ public:
         Tensor v({2, 1, 2, 3});
         v.data().vector().set(0, {1, 5, 9, 1, 5, 9, 1, 5, 9, 1, 5, 9});
 
-        Attention op(Attention::Config(2, 3, 1, true, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 3, 1, true, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
         TensorList ys;
         ys = op.forward({x, q, k, v}, false, false, true);
         // weights = q.dot(k, 2): [2, 1, 1, 3] => [2, 10, 18, ...]
@@ -207,7 +207,7 @@ public:
         Tensor x({2, 1, 2}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 0, 1});
 
-        Attention op(Attention::Config(2, 1, 1, false, 1.0, false, 4, true, TensorInit_Types::One, TensorInit_Types::One));
+        Attention op(Attention::Config(2, 1, 1, false, 1.0, false, 4, false, 2, 1, false, true, TensorInit_Types::One, TensorInit_Types::One));
         // x: [2, 2], wq/wk/wv: [1, 2, 2]
         // q/k/v: [2, 1, 2] => [2, 2, 2, 2]
         // k_cache: [2, 1, 1, 2] => [2, 2, 2, 2]
@@ -237,7 +237,7 @@ public:
         x.data().vector().set(0, {0, 1, 0, 1});
         auto lm_config = LayerNorm::Config({2}, true, 0.1, true, true);
 
-        Attention op(Attention::Config(2, 1, 1, false, 1.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero, lm_config));
+        Attention op(Attention::Config(2, 1, 1, false, 1.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero, lm_config));
         // x: [2, 2], wq/wk/wv: [1, 2, 2]
         // q/k/v: [2, 1, 2] => [1, 1, 1, 1]
         // k_cache: [2, 1, 1, 2] => [1, 1, 1, 1]
@@ -266,7 +266,7 @@ public:
         Tensor x({2, 1, 2}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 0, 1});
 
-        Attention op(Attention::Config(2, 1, 1, false, 4.0, false, 4, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 1, 1, false, 4.0, false, 4, false, 2, 1, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
         // x: [2, 2], wq/wk/wv: [1, 2, 2]
         // q/k/v: [2, 1, 2] => [1, 1, 1, 1]
         // k_cache: [2, 1, 1, 2] => [1, 1, 1, 1]
@@ -295,7 +295,7 @@ public:
         Tensor x({2, 1, 2}, TensorInit_Types::Ordinal);
         x.data().vector().set(0, {0, 1, 0, 1});
 
-        Attention op(Attention::Config(2, 1, 1, false, 1.0, true, 1, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        Attention op(Attention::Config(2, 1, 1, false, 1.0, true, 1, false, 2, 1,false, false, TensorInit_Types::One, TensorInit_Types::Zero));
         // x: [2, 2], wq/wk/wv: [1, 2, 2]
         // q/k/v: [2, 1, 2] => [1, 1, 1, 1]
         // k_cache: [2, 1, 1, 2] => [1, 1, 1, 1]
@@ -319,5 +319,41 @@ public:
         assert(ys[2].data().vector().equals_to({1, 1, 1, 1}));
         assert(ys[3].dim().equals_to({2, 1, 2, 1}));
         assert(ys[3].data().vector().equals_to({1, 1, 1, 1}));
+    }
+
+    static void test_moe() // self attention single node has_lm
+    {
+        Tensor x({2, 1, 2}, TensorInit_Types::Ordinal);
+        x.data().vector().set(0, {0, 1, 0, 1});
+
+        Attention op(Attention::Config(2, 1, 1, false, 1.0, true, 1, true, 3, 2, false, false, TensorInit_Types::One, TensorInit_Types::Zero));
+        // x: [2, 2], wq/wk/wv: [1, 2, 2]
+        // q/k/v: [2, 1, 2] => [1, 1, 1, 1]
+        // k_cache: [2, 1, 1, 2] => [1, 1, 1, 1]
+        // v_cache: [2, 1, 2, 1] => [1, 1, 1, 1]
+        // weights: [2, 1, 1] => [2, 2]
+        // weights: [2, 1, 1] => [1, 1]
+        // y: [2, 1, 2] => [1, 1, 1, 1]
+        // y: [2, 2] => [2, 2, 2, 2] dot
+        // y: [2, 2] => [2, 3, 2, 3] add
+        // fc1: [5, 5, 5, 5]
+        // fc2: [10+2, 10+3, 10+2, 10+3]
+
+        TensorList ys = op.forward({x, Tensor(), Tensor()}, false, true, true);
+        assert(ys.size() == 4);
+
+        assert(ys[0].dim().equals_to({2, 1, 2}));
+        assert(ys[0].data().vector().equals_to({8, 8.66667, 8, 8.66667}, 0.0001)); // only y is changed
+        assert(ys[1].dim().equals_to({2, 1, 1, 2}));
+        assert(ys[1].data().vector().equals_to({1, 1, 1, 1}));
+        assert(ys[2].dim().equals_to({2, 1, 1, 2}));
+        assert(ys[2].data().vector().equals_to({1, 1, 1, 1}));
+        assert(ys[3].dim().equals_to({2, 1, 2, 1}));
+        assert(ys[3].data().vector().equals_to({1, 1, 1, 1}));
+    }
+
+    static void test_mla() // self attention single node has_lm
+    {
+        assert(true); // not implemented yet
     }
 };

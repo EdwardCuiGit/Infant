@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <algorithm>
 #include <functional>
+//#include "debug_util.h"
 
 /*
 Array<T> is basic array class, now it has std::vector<T>, in long run we could implement our own efficient one
@@ -36,6 +37,11 @@ public:
         if (l.size() > 0)
             _v = l;
     }
+    /*Array(T* start, size_t size)
+    {
+        _v.assign(start, start + size);
+    }*/
+
     virtual ~Array() {clear();} 
 
     // TODO: initial goal for this func is to allocate memory but not init
@@ -51,7 +57,7 @@ public:
 
     /***************************************************************************************************************/
     // set functions
-    inline std::vector<T>::reference operator[](uint index)
+    inline typename std::vector<T>::reference operator[](uint index)
     {
         if (index >= size())
         {
@@ -160,6 +166,17 @@ public:
 
     /***************************************************************************************************************/
     // get functions, all const
+
+    inline T* ptr() 
+    {
+        return _v.data();
+    }
+
+    inline const T* ptr()  const
+    {
+        return _v.data();
+    }
+
     inline const T &operator[](uint index) const
     {
         assert(index < size());
@@ -228,7 +245,7 @@ public:
         {
             if (get(i) == a2.get(i))
                 continue;
-            if (!Math<double>::almost_equal(get(i), a2.get(i), noise_level))
+            if (!Math<float>::almost_equal(get(i), a2.get(i), noise_level))
                 return false;
         }
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/4.train/optimizer_base.h"
+#include "inc/4.train/optimizer_base.h"
 
 class TestOptimizers: public TestClass
 {

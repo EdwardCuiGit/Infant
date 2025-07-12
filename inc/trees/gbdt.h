@@ -1,5 +1,5 @@
 #pragma once
-#include "../0.tensors/tensor.h"
+#include "inc/0.tensors/tensor.h"
 #include <queue>
 
 class Gbdt
@@ -18,12 +18,12 @@ public:
         FeatureTypes _type;
         union
         {
-            double max_float;
+            float max_float;
             int max_int;
         } max_value;
         union
         {
-            double min_float;
+            float min_float;
             int min_int;
         } min_value;
     };
@@ -32,10 +32,10 @@ public:
     {
     public:
         int _feature_id = -1;
-        double _threshold = NAN; // note: only supports binary tree now
-        double _split_gain = 0;
-        double _score = NAN;
-        double _entropy = NAN;
+        float _threshold = NAN; // note: only supports binary tree now
+        float _split_gain = 0;
+        float _score = NAN;
+        float _entropy = NAN;
         int _left_child = -1, _right_child = -1;
         uint _layer;
         GbdtNode(uint layer) : _layer(layer) {}
@@ -72,22 +72,22 @@ public:
         uint _max_layers = 5;
         uint _min_samples_per_leave = 100;
         uint _max_bins = 10;
-        double _min_bin_size = 0.00001;
-        double _feature_fraction = 1; // not implemented
-        double _data_fraction = 1;    // not implemented
-        double _min_split_gain = 0.1;
-        double _min_node_entropy = 0; // not used
-        double _min_avg_residual = 0.1;
+        float _min_bin_size = 0.00001;
+        float _feature_fraction = 1; // not implemented
+        float _data_fraction = 1;    // not implemented
+        float _min_split_gain = 0.1;
+        float _min_node_entropy = 0; // not used
+        float _min_avg_residual = 0.1;
     };
 
 public:
-    bool train(const TensorDArray<double> training_data, const Array<FeatureType> &feature_types, const GbdtTrainingConfig &config, GbdtEnsemble &model)
+    bool train(const TensorDArray<float> training_data, const Array<FeatureType> &feature_types, const GbdtTrainingConfig &config, GbdtEnsemble &model)
     {
         // x is 2-dim feature array, z is 1-dim labels;
         if (training_data.size() == 0) return false;
         assert(training_data.size() == 2);
-        const TensorD<double> &x = training_data[0];
-        const TensorD<double> &z = training_data[1];
+        const TensorD<float> &x = training_data[0];
+        const TensorD<float> &z = training_data[1];
         assert(x.shape() == 2); // note: don't consider batch so far
         assert(z.shape() == 1);
         assert(x.dim()[0] == z.dim()[0]);
@@ -96,8 +96,8 @@ public:
         assert(feature_types.size() == n);
 
         model._trees.clear();                                              // make the output model to be empty
-        TensorD<double> y({config._max_trees, m}, TensorInit_Types::Zero); // model outputs per tree, note: we may use 2-dim tensor
-        TensorD<double> residual({config._max_trees, m});
+        TensorD<float> y({config._max_trees, m}, TensorInit_Types::Zero); // model outputs per tree, note: we may use 2-dim tensor
+        TensorD<float> residual({config._max_trees, m});
 
         for (uint i = 0; i < config._max_trees; ++i)
         {
@@ -111,7 +111,7 @@ public:
             // note: to make it productive, we just need to use previous residual - current tree's y
             // note: we only need to store previous tree's residual, but store for every tree now for debugging purpose
             calc_residual(y, z, residual, i);
-            double avg_residual = residual.vector().avg(i * m, m);
+            float avg_residual = residual.vector().avg(i * m, m);
             if (avg_residual < config._min_avg_residual)
             {
                 return true;
@@ -121,7 +121,7 @@ public:
         return true;
     }
 
-    void run_tree(const GbdtTree &tree, const TensorD<double> &x, TensorD<double> &y, uint tree_id)
+    void run_tree(const GbdtTree &tree, const TensorD<float> &x, TensorD<float> &y, uint tree_id)
     {
         assert(x.shape() == 2);
         uint m = x.dim()[0];
@@ -135,7 +135,7 @@ public:
 
     // note: shall we learn one complete boolean expression, seems tree is one special case
     // note: shall we pre-cache all the tree paths and speed up this?
-    double run_tree(const GbdtTree &tree, const TensorD<double> &x, uint sample_id)
+    float run_tree(const GbdtTree &tree, const TensorD<float> &x, uint sample_id)
     {
         assert(x.shape() == 2 && sample_id < x.dim()[0]);
         uint n = x.dim()[1];
@@ -147,7 +147,7 @@ public:
             uint curr_feature_id = tree._nodes[curr_node]._feature_id;
             assert(curr_feature_id < n);
             // sample_id represents one sample, sample_id * n is start offset of current feature
-            double feature_value = x.vector()[x_start + curr_feature_id];
+            float feature_value = x.vector()[x_start + curr_feature_id];
             // treat == as left child move
             parent_node = curr_node;
             if (feature_value <= tree._nodes[curr_node]._threshold)
@@ -166,7 +166,7 @@ public:
             return tree._nodes[parent_node]._score;
     }
 
-    void calc_residual(const TensorD<double> &y, const TensorD<double> &z, TensorD<double> &residual, uint tree_id)
+    void calc_residual(const TensorD<float> &y, const TensorD<float> &z, TensorD<float> &residual, uint tree_id)
     {
         assert(y.shape() == 2 && y.dim().equals_to(residual.dim()));
         assert(z.shape() == 1 && z.dim()[0] == y.dim()[1]);
@@ -187,7 +187,7 @@ public:
         }
     }
 
-    bool build_tree(const TensorD<double> &x, const TensorD<double> &z, const TensorD<double> &residual,
+    bool build_tree(const TensorD<float> &x, const TensorD<float> &z, const TensorD<float> &residual,
                     const Array<FeatureType> &feature_types, const GbdtTrainingConfig &config, GbdtTree &tree, uint tree_id)
     {
         uint m = x.dim()[0];
@@ -210,10 +210,10 @@ public:
             uint node_id = pair.second;
 
             // prepare labels for selected samples
-            Vector<double> curr_labels;
+            Vector<float> curr_labels;
             for (uint sample_id = 0; sample_id < samples.size(); ++sample_id)
             {
-                double label;
+                float label;
                 if (tree_id == 0)
                     label = z.vector()[sample_id];
                 else
@@ -239,7 +239,7 @@ public:
         return true;
     }
 
-    bool split_node(const Vector<uint> &samples, const TensorD<double> &x, const Vector<double> &curr_labels,
+    bool split_node(const Vector<uint> &samples, const TensorD<float> &x, const Vector<float> &curr_labels,
                     const Array<FeatureType> &feature_types,
                     const GbdtTrainingConfig &config, GbdtNode &node, Vector<uint> &left_samples, Vector<uint> &right_samples)
     {
@@ -253,20 +253,20 @@ public:
             return false;
         }
 
-        double min_entropy = 1e300;
+        float min_entropy = 1e300;
         uint best_feature_id = -1;
-        double best_threshold;
+        float best_threshold;
         for (uint feature_id = 0; feature_id < n; feature_id++)
         {
             // to speed up, cache features into one continous memory
-            Vector<double> curr_features;
+            Vector<float> curr_features;
             // Vector<uint> curr_sorts;
-            double min_feature, max_feature;
+            float min_feature, max_feature;
             for (uint samples_id = 0; samples_id < samples.size(); ++samples_id)
             {
                 uint sample_id = samples[samples_id];
                 assert(sample_id < m);
-                double feature_value = x.vector()[sample_id * n + feature_id];
+                float feature_value = x.vector()[sample_id * n + feature_id];
                 curr_features.push_back(feature_value);
                 // curr_sorts.push_back(sorts.vector()[sample_id * n + feature_id]);
                 if (samples_id == 0)
@@ -286,7 +286,7 @@ public:
                 }
             }
 
-            double best_feature_threshold, min_feature_entropy;
+            float best_feature_threshold, min_feature_entropy;
             bool success = find_threshold(curr_features, curr_labels, feature_types[feature_id], config._max_bins, config._min_bin_size, min_feature,
                                           max_feature, best_feature_threshold, min_feature_entropy);
             if (success && min_feature_entropy < min_entropy)
@@ -310,7 +310,7 @@ public:
             for (uint samples_id = 0; samples_id < samples.size(); ++samples_id)
             {
                 uint sample_id = samples[samples_id];
-                double feature_value = x.vector()[sample_id * n + best_feature_id];
+                float feature_value = x.vector()[sample_id * n + best_feature_id];
                 if (feature_value <= best_threshold)
                 {
                     left_samples.push_back(sample_id);
@@ -330,7 +330,7 @@ public:
         }
     }
 
-    double calc_node_score(const Vector<double> &labels)
+    float calc_node_score(const Vector<float> &labels)
     {
         return labels.avg(); // note: this is for regression loss only
     }
@@ -338,12 +338,12 @@ public:
     // TODO: draw histogram/distribution of features, and don't make bins same size
     // TODO: left child histogram could build from parent histogram?
     // TODO: right child histogram could be parent histogram - left child histogram?
-    bool find_threshold(const Vector<double> &features, const Vector<double> &labels,
-                        const FeatureType &feature_type, uint max_bins, double min_bin_size,
-                        double min_feature, double max_feature, double &best_threshold, double &min_feature_entropy)
+    bool find_threshold(const Vector<float> &features, const Vector<float> &labels,
+                        const FeatureType &feature_type, uint max_bins, float min_bin_size,
+                        float min_feature, float max_feature, float &best_threshold, float &min_feature_entropy)
     {
         // build histogram of this features vector, may fail if all features are the same
-        Vector<Vector<double>> bins_vector; // each bin stores the vector of labels
+        Vector<Vector<float>> bins_vector; // each bin stores the vector of labels
         build_histogram(features, labels, feature_type, max_bins, min_bin_size, min_feature, max_feature, bins_vector);
         if (bins_vector.size() <= 1) // no need to split
         {
@@ -351,11 +351,11 @@ public:
         }
 
         // flatten this bins_vector and stores the size of each so that we can use one continuous vector to calculate variance
-        Vector<double> flatten_vector;
-        Vector<double>::Flatten(bins_vector, flatten_vector);
+        Vector<float> flatten_vector;
+        Vector<float>::Flatten(bins_vector, flatten_vector);
 
         // loop histogram to calculate feature gains per each bin
-        double bin_size = (max_feature - min_feature) / bins_vector.size();
+        float bin_size = (max_feature - min_feature) / bins_vector.size();
         uint left_size = 0, right_size = flatten_vector.size();
         for (uint i = 1; i < bins_vector.size(); ++i)
         {
@@ -366,8 +366,8 @@ public:
             right_size -= bins_vector[i - 1].size();
             assert(left_size > 0 && right_size > 0);
 
-            double feature_entropy = calc_entropy(flatten_vector, left_size);
-            double threshold = min_feature + bin_size * i;
+            float feature_entropy = calc_entropy(flatten_vector, left_size);
+            float threshold = min_feature + bin_size * i;
             if (i == 1)
             {
                 min_feature_entropy = feature_entropy;
@@ -385,17 +385,17 @@ public:
 
     // can we pre-calculate each bin's variance and then do speed up? => seems not
     // TODO: for binary classification or ranking loss, we may need different feature gain function, so far only use variance
-    double calc_entropy(const Vector<double> &flatten_vector, uint left_size)
+    float calc_entropy(const Vector<float> &flatten_vector, uint left_size)
     {
-        double left_variance = flatten_vector.var(0, left_size);
-        double right_variance = flatten_vector.var(left_size, flatten_vector.size() - left_size);
+        float left_variance = flatten_vector.var(0, left_size);
+        float right_variance = flatten_vector.var(left_size, flatten_vector.size() - left_size);
         return left_variance + right_variance;
     }
 
     // TODO: we shall use global data to do histogram, instead of each selected subsets of samples
-    void build_histogram(const Vector<double> &features, const Vector<double> &labels,
-                         const FeatureType &feature_type, uint max_bins, double min_bin_size, 
-                         double min_feature, double max_feature, Vector<Vector<double>> &bins_vector)
+    void build_histogram(const Vector<float> &features, const Vector<float> &labels,
+                         const FeatureType &feature_type, uint max_bins, float min_bin_size, 
+                         float min_feature, float max_feature, Vector<Vector<float>> &bins_vector)
     {
         // TODO: use feature_type here
         assert(max_bins >= 1);
@@ -416,7 +416,7 @@ public:
             bins = 1;
         }
 
-        double bin_size = (max_feature - min_feature) / bins;
+        float bin_size = (max_feature - min_feature) / bins;
 
         bins_vector.reserve(bins);
         for (uint i = 0; i < features.size(); ++i)
@@ -426,7 +426,7 @@ public:
         }
     }
 
-    TensorD<double> &inference(const TensorD<double> &x, TensorD<double> &y, const GbdtEnsemble &model)
+    TensorD<float> &inference(const TensorD<float> &x, TensorD<float> &y, const GbdtEnsemble &model)
     {
         if (x.size() == 0) return y;
         assert(x.shape() == 2);

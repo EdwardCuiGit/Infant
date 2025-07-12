@@ -1,6 +1,6 @@
 #pragma once
 #include "unit_test.h"
-#include "../inc/3.network/transformer.h"
+#include "inc/3.network/transformer.h"
 
 class TestTransformer: public TestClass
 {

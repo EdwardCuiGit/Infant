@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../1.functors/tensor_node.h"
+#include "inc/1.functors/tensor_node.h"
 #include <iostream>
 #include <fstream>
 
@@ -137,14 +137,14 @@ public:
     virtual Tensor _text_to_tensor(const Array<std::string>& lines_txt, Tensor& data) const
     {
         // by default, it's convert each char to be it's ascii value
-        Vector<double> _vector(lines_txt.size() * _max_node_len);
+        Vector<float> _vector(lines_txt.size() * _max_node_len);
         for (uint row = 0; row < lines_txt.size(); ++row)
         {
             const char* ch = lines_txt[row].data();
             bool found_end = false;
             for (uint node_count = 0; node_count < _max_node_len; node_count++)
             {
-                double v;
+                float v;
                 if (*ch != 0)
                 {
                     if (node_count == _max_node_len - 1)
